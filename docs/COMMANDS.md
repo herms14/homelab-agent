@@ -1,6 +1,8 @@
 # Command Reference
 
-> Complete reference for all Homelab Agent commands
+> Complete reference for all Homelab Agent commands (v1.1.0)
+
+Every command reads `CLAUDE.md` first, then looks up docs by **role** from its Documentation Structure table (Network, Proxmox, Services, IP Map, Changelog, Task Registry, ...). Roles you haven't configured are skipped. The **Sensitive** role is never read.
 
 ---
 
@@ -8,16 +10,29 @@
 
 | Command | Category | Purpose |
 |---------|----------|---------|
-| `/homelab` | Core | Main menu and dashboard |
-| `/lab-status` | Core | Infrastructure status reports |
+| `/homelab` | Core | Main menu, summary, open tasks, alerts |
+| `/lab-status` | Core | Infrastructure status report (docs or live) |
 | `/service-list` | Core | Service catalog |
-| `/ip-find` | Management | IP address management |
-| `/deploy-new` | Management | Deployment code generator |
-| `/capacity` | Management | Resource capacity planning |
-| `/troubleshoot` | Operations | Troubleshooting assistant |
-| `/lab-changelog` | Operations | Change tracking |
-| `/runbook` | Operations | Runbook generator |
-| `/doc-sync` | Operations | Documentation verification |
+| `/ip-find` | Management | IP allocation, conflicts, reservations |
+| `/deploy-new` | Management | Deployment code + doc checklist |
+| `/capacity` | Management | Headroom and placement |
+| `/troubleshoot` | Operations | Known issues, gotchas, diagnostics |
+| `/lab-changelog` | Operations | Change log + task closure |
+| `/runbook` | Operations | Operational procedures |
+| `/doc-sync` | Operations | Documentation verification and fixes |
+
+---
+
+## Shared Conventions
+
+| Convention | Used by | Defined in |
+|------------|---------|------------|
+| Doc roles | All commands | `CLAUDE.md` → Documentation Structure |
+| Change Documentation Protocol | deploy-new, ip-find, lab-changelog, runbook, doc-sync, troubleshoot | `CLAUDE.md` |
+| Task Registry | homelab, lab-status, deploy-new, lab-changelog, runbook, doc-sync | `CLAUDE.md` + `templates/Task Registry.md` |
+| Retired Components | homelab, lab-status, ip-find, capacity, doc-sync | `CLAUDE.md` |
+| Known Gotchas | homelab, ip-find, deploy-new, troubleshoot, runbook | `CLAUDE.md` |
+| Live data (read-only) | lab-status, capacity, doc-sync | Optional SSH to a Proxmox node |
 
 ---
 
@@ -27,18 +42,14 @@
 
 **Main menu and infrastructure dashboard**
 
-Displays infrastructure summary, available commands, and current alerts.
-
 ```bash
-/homelab              # Show main menu
-/homelab quick        # Just show commands
-/homelab alerts       # Focus on alerts only
+/homelab              # Main menu
+/homelab quick        # Just the command list
+/homelab alerts       # Alerts only
+/homelab tasks        # Task Registry summary only
 ```
 
-**Output includes:**
-- Infrastructure summary (nodes, VMs, services)
-- Quick action menu
-- Current alerts and warnings
+**Shows:** node/VM/LXC/service/VLAN counts, Task Registry counts, quick actions, alerts (recent changes, blocked or stale tasks, stale docs, capacity, relevant gotchas). Retired components show as `n/a`.
 
 ---
 
@@ -46,51 +57,37 @@ Displays infrastructure summary, available commands, and current alerts.
 
 **Comprehensive infrastructure status report**
 
-Generates detailed status for all infrastructure components.
-
 ```bash
 /lab-status           # Full report
-/lab-status proxmox   # Proxmox cluster only
-/lab-status k8s       # Kubernetes only
+/lab-status proxmox   # Cluster only
+/lab-status guests    # VM / LXC inventory
+/lab-status k8s       # Kubernetes (if active)
 /lab-status services  # Services only
-/lab-status storage   # Storage only
+/lab-status storage   # Storage and backups
 /lab-status network   # Network only
+/lab-status tasks     # Open tasks
 /lab-status quick     # Summary only
+/lab-status live      # Force read-only pvesh/pvecm queries
 ```
 
-**Report sections:**
-- Proxmox cluster health
-- Kubernetes cluster status
-- Service status by category
-- Storage utilization
-- Network overview
-- Alerts and recommendations
+**Sections:** Proxmox health and quorum, guest inventory, Kubernetes (omitted if retired), services by category, storage and last backup, network, utilization bars, open tasks, alerts, recent activity, recommendations. States whether data came from docs or live.
 
 ---
 
 ### /service-list
 
-**Service catalog with URLs and details**
-
-Lists all deployed services with access information.
+**Service catalog**
 
 ```bash
 /service-list                    # All services
-/service-list media              # Media stack only
-/service-list core               # Core infrastructure
-/service-list monitoring         # Monitoring services
-/service-list utilities          # Utility services
-/service-list search [term]      # Search by name
-/service-list url [service]      # Get URL for service
-/service-list port [number]      # Find service by port
+/service-list [category]         # e.g. media, core, monitoring
+/service-list host [name]        # Services on one host
+/service-list search [term]      # Search
+/service-list url [service]      # URL for a service
+/service-list port [number]      # Service by port
 ```
 
-**Information provided:**
-- Service name and description
-- Access URL (internal/external)
-- Backend type (Docker/LXC/K8s)
-- Port number
-- Authentication method
+**Columns:** service, URL, host, type, port, auth. Also lists stopped/retired services and statistics. Never prints API keys.
 
 ---
 
@@ -98,27 +95,20 @@ Lists all deployed services with access information.
 
 ### /ip-find
 
-**IP address management and allocation**
-
-Find available IPs, check allocations, and prevent conflicts.
+**IP address management**
 
 ```bash
 /ip-find                              # All VLANs summary
 /ip-find vlan20                       # Specific VLAN
-/ip-find homelab                      # By VLAN name
-/ip-find check 192.168.20.100         # Check if IP is used
-/ip-find next                         # Next available (default VLAN)
-/ip-find next vlan30                  # Next available in VLAN
-/ip-find reserve 192.168.20.100 "VM"  # Reserve and document
-/ip-find search [term]                # Search by device name
+/ip-find check 10.0.20.100            # Is it used?
+/ip-find next                         # Next free in default VLAN
+/ip-find next vlan40                  # Next free in a VLAN
+/ip-find reserve 10.0.20.100 "Name"   # Reserve and document
+/ip-find search [term]                # Search by device
+/ip-find conflicts                    # Duplicate allocations only
 ```
 
-**Features:**
-- Shows allocated vs available IPs
-- Displays reserved ranges
-- Suggests next available IP
-- Detects potential conflicts
-- Updates documentation
+**Rules:** an IP counts as used if any doc claims it or it's listed in Known Gotchas; IPs of Retired Components are free; duplicates are flagged. Reserving follows the Change Documentation Protocol.
 
 ---
 
@@ -126,52 +116,37 @@ Find available IPs, check allocations, and prevent conflicts.
 
 **Deployment code generator**
 
-Generate Terraform, Docker Compose, and Ansible code for new services.
-
 ```bash
-/deploy-new                           # Interactive wizard
-/deploy-new docker [name]             # Docker service only
-/deploy-new vm [name]                 # New VM with service
+/deploy-new                           # Wizard
+/deploy-new docker [name]             # Docker on existing host
 /deploy-new lxc [name]                # LXC container
-/deploy-new k8s [name]                # Kubernetes deployment
-/deploy-new [name] --image [img:tag]  # Specify Docker image
-/deploy-new [name] --port [port]      # Specify port
+/deploy-new vm [name]                 # New VM
+/deploy-new k8s [name]                # Kubernetes
+/deploy-new [name] --image [img:tag]
+/deploy-new [name] --port [port]
+/deploy-new [name] --host [host]
 ```
 
-**Generates:**
-- Terraform VM/LXC definition
-- Docker Compose file
-- Traefik routing configuration
-- Authentik SSO setup
-- Documentation updates
-- Deployment checklist
+**Generates:** `pct create` or Terraform, Docker Compose (with log rotation), reverse proxy route, SSO steps, DNS, monitoring, doc updates by role, verification checklist, rollback. Checks the Task Registry first and marks the task in progress. Uses env vars, never real secrets.
 
 ---
 
 ### /capacity
 
-**Resource capacity planning**
-
-Analyze current utilization and plan new deployments.
+**Capacity planning**
 
 ```bash
-/capacity                    # Full capacity report
-/capacity plan 4cpu 8gb      # Check if specs fit
-/capacity proxmox            # Proxmox only
-/capacity k8s                # Kubernetes only
-/capacity storage            # Storage only
-/capacity network            # IP availability
-/capacity forecast           # 3-month projection
-/capacity node [name]        # Specific node details
+/capacity                    # Full report
+/capacity plan 4cpu 8gb      # Does it fit, and where?
+/capacity proxmox
+/capacity k8s
+/capacity storage
+/capacity network
+/capacity forecast           # Projection from Changelog growth
+/capacity node [name]
 ```
 
-**Analysis includes:**
-- Per-node resource breakdown
-- Cluster totals and utilization
-- Storage pool status
-- Kubernetes resource requests
-- Placement recommendations
-- Growth projections
+**Includes:** per-node cores/RAM allocation, largest consumers, storage pools, free IPs, placement advice (including "use an LXC instead"), thresholds 🟢 <70% · 🟡 70-85% · 🔴 >85%.
 
 ---
 
@@ -181,83 +156,57 @@ Analyze current utilization and plan new deployments.
 
 **Troubleshooting assistant**
 
-Search known issues and get diagnostic guidance.
-
 ```bash
-/troubleshoot [description]     # Search for issue
-/troubleshoot docker            # Docker-specific help
-/troubleshoot network           # Network issues
-/troubleshoot proxmox           # Proxmox issues
-/troubleshoot k8s               # Kubernetes issues
-/troubleshoot auth              # Authentication issues
-/troubleshoot [service-name]    # Service-specific help
-/troubleshoot add               # Add new troubleshooting entry
-/troubleshoot diag [service]    # Generate diagnostic commands
+/troubleshoot [description]
+/troubleshoot docker | network | proxmox | k8s | auth
+/troubleshoot [service-name]
+/troubleshoot add
+/troubleshoot diag [service]
 ```
 
-**Provides:**
-- Matching known issues
-- Step-by-step solutions
-- Diagnostic commands
-- Related documentation links
-- Option to add new entries
+**Approach:** Known Gotchas and Troubleshooting doc first, then recent Changelog entries for the affected thing, then read-only diagnostics, then fixes (with confirmation). Ships a table of generic gotchas (stale ARP, duplicate IPs, unrotated logs, NFS mount options, SSO redirect loops, lost quorum). Offers to record new issues and gotchas.
 
 ---
 
 ### /lab-changelog
 
-**Infrastructure change tracking**
-
-Maintain audit trail of all infrastructure changes.
+**Change tracking**
 
 ```bash
-/lab-changelog                    # View recent entries
-/lab-changelog add "Description"  # Add new entry
-/lab-changelog add                # Interactive add
-/lab-changelog today              # Today's changes
-/lab-changelog week               # This week's changes
-/lab-changelog month              # This month's changes
-/lab-changelog search [term]      # Search changelog
-/lab-changelog stats              # Show statistics
+/lab-changelog                    # Recent entries
+/lab-changelog add "Description"
+/lab-changelog add                # Interactive
+/lab-changelog today | week | month
+/lab-changelog search [term]
+/lab-changelog stats
+/lab-changelog detect             # Find undocumented changes
+/lab-changelog export
 ```
 
-**Change categories:**
-- Added - New resources
-- Changed - Modifications
-- Fixed - Bug fixes
-- Removed - Decommissioned items
-- Infrastructure - Hardware changes
-- Security - Security updates
+**Categories:** Added, Changed, Fixed, Removed, Infrastructure, Security. Appends to today's heading, lists Protocol follow-ups, offers to close the matching Task Registry item, and suggests adding big removals to Retired Components.
 
 ---
 
 ### /runbook
 
-**Operational runbook generator**
-
-Generate step-by-step procedures for common tasks.
+**Runbook generator**
 
 ```bash
-/runbook                         # List available runbooks
-/runbook maintenance             # Node maintenance procedure
-/runbook backup                  # Backup procedures
-/runbook disaster-recovery       # DR procedures (or /runbook dr)
-/runbook service-restart [svc]   # Restart specific service
-/runbook upgrade [component]     # Upgrade procedure
-/runbook scale [component]       # Scaling procedure
-/runbook network [change]        # Network changes
-/runbook security [task]         # Security procedures
-/runbook custom [title]          # Generate custom runbook
+/runbook
+/runbook maintenance [node]
+/runbook backup
+/runbook dr
+/runbook service-restart [svc]
+/runbook upgrade [component]
+/runbook patching
+/runbook scale [component]
+/runbook network [change]
+/runbook decommission [target]
+/runbook security [task]
+/runbook custom [title]
 ```
 
-**Runbook sections:**
-- Overview and metadata
-- Prerequisites
-- Pre-checks
-- Step-by-step procedure
-- Verification steps
-- Rollback procedure
-- Troubleshooting
+**Sections:** overview, prerequisites (backup, Task Registry check), pre-checks, procedure, verification, rollback, troubleshooting, post-procedure Protocol checklist. Can save to your Runbooks location.
 
 ---
 
@@ -265,81 +214,49 @@ Generate step-by-step procedures for common tasks.
 
 **Documentation verification**
 
-Verify documentation accuracy and find discrepancies.
-
 ```bash
-/doc-sync                # Full sync report
-/doc-sync services       # Service catalog only
-/doc-sync ips            # IP addresses only
-/doc-sync configs        # Configurations only
-/doc-sync stale          # Stale content only
-/doc-sync fix            # Generate fix suggestions
-/doc-sync apply          # Apply auto-fixes
-/doc-sync [filename]     # Check specific file
+/doc-sync                # Full report
+/doc-sync services | ips | guests
+/doc-sync retired        # Mentions of retired components
+/doc-sync tasks          # Task Registry hygiene
+/doc-sync stale
+/doc-sync live           # Compare with read-only pvesh/pct output
+/doc-sync fix            # Suggest fixes
+/doc-sync apply          # Apply with confirmation
+/doc-sync [filename]
 ```
 
-**Checks performed:**
-- Missing documentation entries
-- Incorrect information
-- Outdated entries
-- Potential duplicates
-- Stale content detection
+**Checks:** missing entries, duplicate IPs, guest inventory, cross-doc consistency (including `CLAUDE.md`), retired-but-mentioned, changelog coverage, stale tasks, freshness. Never opens the Sensitive doc.
 
 ---
 
-## Command Cheat Sheet
-
-### Daily Operations
+## Cheat Sheet
 
 ```bash
-/lab-status quick        # Morning status check
-/service-list            # Quick service lookup
-/lab-changelog today     # Review changes
+# Morning
+/homelab
+/lab-status quick
+
+# New service
+/capacity plan 2cpu 4gb
+/ip-find next vlan40
+/deploy-new lxc my-service
+/lab-changelog add "Deployed my-service"
+
+# Something broke
+/troubleshoot my-service returns 502
+/troubleshoot diag my-service
+
+# Monthly hygiene
+/doc-sync
+/doc-sync retired
+/runbook patching
 ```
-
-### Deploying Services
-
-```bash
-/capacity plan 4cpu 8gb  # Check resources
-/ip-find next vlan20     # Find IP
-/deploy-new docker svc   # Generate code
-/lab-changelog add "..."  # Log change
-```
-
-### Troubleshooting
-
-```bash
-/troubleshoot [issue]    # Search issues
-/troubleshoot diag svc   # Get diagnostics
-/doc-sync services       # Verify docs
-```
-
-### Maintenance
-
-```bash
-/runbook maintenance     # Get procedure
-/capacity node node01    # Check resources
-/doc-sync                # Verify accuracy
-```
-
----
-
-## Tips & Best Practices
-
-1. **Start with `/homelab`** to see the overview
-2. **Use `/lab-status quick`** for fast daily checks
-3. **Always log changes** with `/lab-changelog`
-4. **Run `/doc-sync`** periodically to keep docs current
-5. **Use `/capacity plan`** before deploying new VMs
-6. **Generate runbooks** for repeatable procedures
 
 ---
 
 ## Getting Help
 
-If a command isn't working as expected:
-
-1. Check that `CLAUDE.md` has correct file paths
-2. Ensure documentation files exist
-3. Try running with more specific arguments
-4. Check [GitHub Issues](https://github.com/herms14/homelab-agent/issues)
+1. Check the Documentation Structure paths in `CLAUDE.md`
+2. Make sure the docs exist and use the role names
+3. Open an [issue](https://github.com/herms14/homelab-agent/issues)

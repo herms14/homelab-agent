@@ -4,30 +4,32 @@ Generate operational runbooks and procedures for homelab tasks.
 
 ## Instructions
 
-Create step-by-step operational procedures for common homelab tasks.
+Create step-by-step operational procedures for common homelab tasks, grounded in your own documentation.
 
 ### Data Sources
 
-Read all homelab documentation for context:
-- `07 HomeLab Things/Claude Managed Homelab/` - All files
-- Focus on procedures already documented
+Read `CLAUDE.md` first (node names, storage, backup setup, SSH user, **Known Gotchas**). Then, using its **Documentation Structure** table, read the docs relevant to the runbook (**Proxmox**, **Storage**, **Network**, **Services**, **Automation**, **Troubleshooting**) and any existing runbooks under the **Runbooks** role. Reuse procedures already documented rather than inventing new ones.
+
+Never open the doc listed under the **Sensitive** role. Reference credentials by name only (e.g. "the PBS admin password").
 
 ### Available Runbooks
 
 | Runbook | Purpose |
 |---------|---------|
-| `maintenance` | Proxmox node maintenance |
+| `maintenance` | Proxmox node maintenance (migrate, update, reboot) |
 | `backup` | Backup and restore procedures |
-| `disaster-recovery` | DR procedures |
+| `disaster-recovery` | DR / rebuild procedures |
 | `service-restart` | Restart services safely |
-| `upgrade` | System/service upgrades |
+| `upgrade` | System/service upgrades (incl. Proxmox major versions) |
+| `patching` | Routine OS / container patching across hosts |
 | `scale` | Add resources/nodes |
-| `network` | Network changes |
-| `security` | Security procedures |
+| `network` | Network changes (VLANs, re-IP a host) |
+| `decommission` | Retire a service, host, or cluster cleanly |
+| `security` | Security procedures (key rotation, access review) |
 
 ### Output Format
 
-```markdown
+````markdown
 # 📖 Runbook: [Title]
 
 ## Overview
@@ -38,6 +40,7 @@ Read all homelab documentation for context:
 | **Duration** | [Estimated time] |
 | **Risk Level** | Low / Medium / High |
 | **Requires Downtime** | Yes / No / Partial |
+| **Affected** | [Hosts / services] |
 | **Last Updated** | [Date] |
 | **Author** | Homelab Agent |
 
@@ -45,15 +48,13 @@ Read all homelab documentation for context:
 
 ## Prerequisites
 
-- [ ] [Prerequisite 1]
-- [ ] [Prerequisite 2]
+- [ ] Recent backup verified for affected guests
+- [ ] Task Registry checked; nobody else is working on these hosts
 - [ ] [Access/permissions needed]
 
 ---
 
 ## Pre-Checks
-
-Before starting, verify:
 
 ```bash
 # [Check commands]
@@ -71,7 +72,6 @@ Before starting, verify:
 **Purpose**: [Why this step]
 
 ```bash
-# Commands for this step
 [command 1]
 [command 2]
 ```
@@ -87,30 +87,16 @@ Before starting, verify:
 
 ### Step 2: [Step Title]
 
-**Purpose**: [Why this step]
-
-```bash
-[commands]
-```
-
----
-
-### Step 3: [Step Title]
-
 ...
 
 ---
 
 ## Verification
 
-After completing all steps:
-
 ```bash
 # Verification commands
 ```
 
-- [ ] [Verification check 1]
-- [ ] [Verification check 2]
 - [ ] [Service accessible]
 - [ ] [No errors in logs]
 
@@ -118,14 +104,6 @@ After completing all steps:
 
 ## Rollback Procedure
 
-If something goes wrong:
-
-### Rollback Step 1
-```bash
-[rollback commands]
-```
-
-### Rollback Step 2
 ```bash
 [rollback commands]
 ```
@@ -134,29 +112,17 @@ If something goes wrong:
 
 ## Troubleshooting
 
-### Common Issues
-
-**Issue**: [Description]
-**Solution**: [Fix]
-
 **Issue**: [Description]
 **Solution**: [Fix]
 
 ---
 
-## Post-Procedure
+## Post-Procedure (Change Documentation Protocol)
 
-- [ ] Update documentation if needed
-- [ ] Log changes to changelog: `/lab-changelog add`
-- [ ] Notify team/users if applicable
+- [ ] Update the relevant docs (Proxmox / Services / IP Map / Network)
+- [ ] Log changes: `/lab-changelog add "..."`
+- [ ] Mark the task `✅ Completed` in the Task Registry
 - [ ] Monitor for issues
-
----
-
-## Related Documentation
-
-- [[Related Doc 1]]
-- [[Related Doc 2]]
 
 ---
 
@@ -165,33 +131,45 @@ If something goes wrong:
 | Date | Change | Author |
 |------|--------|--------|
 | [Date] | Initial creation | Homelab Agent |
-```
+````
 
 ### Runbook Templates
 
 **Node Maintenance**:
-1. Pre-checks (cluster quorum, VM inventory)
-2. Enable maintenance mode
-3. Migrate VMs
-4. Perform maintenance
-5. Restore normal operation
-6. Verify
+1. Pre-checks (`pvecm status`, guest inventory, backups)
+2. Migrate or shut down guests (local-storage LXCs cannot live-migrate)
+3. Perform maintenance (`apt update && apt full-upgrade`)
+4. Reboot, confirm quorum
+5. Flush stale ARP for any re-created guests (see Known Gotchas)
+6. Restore guests, verify
+
+**Patching**:
+1. Inventory hosts and exclusions (e.g. backup server, automation controller)
+2. Confirm backups / snapshots
+3. Patch in a maintenance window, one host at a time
+4. Reboot if required
+5. Verify services; log results
 
 **Backup Procedures**:
-1. List what to backup
-2. Verify backup targets
+1. List what to back up
+2. Verify backup targets and free space
 3. Execute backups
-4. Verify backup integrity
+4. Verify integrity (test restore of one guest)
 5. Document completion
 
 **Service Restart**:
 1. Identify dependencies
-2. Notify users
-3. Stop service gracefully
-4. Verify stopped
-5. Start service
-6. Verify running
-7. Test functionality
+2. Stop service gracefully
+3. Start service
+4. Verify running and reachable through the reverse proxy
+
+**Decommission**:
+1. Confirm nothing depends on it (Services, reverse proxy, DNS, monitoring)
+2. Final backup
+3. Stop, then destroy (after confirmation)
+4. Remove routing, SSO app, DNS, monitors
+5. Free the IP in the IP Map; add to **Retired Components** in `CLAUDE.md`
+6. Changelog `Removed` entry
 
 **Disaster Recovery**:
 1. Assess situation
@@ -201,15 +179,21 @@ If something goes wrong:
 5. Test services
 6. Document incident
 
+### Saving
+
+Offer to save the runbook to the **Runbooks** location from `CLAUDE.md` (e.g. `runbooks/[name].md`) and add a Changelog `Added` entry.
+
 ## Arguments
 
 - `/runbook` - List available runbooks
-- `/runbook maintenance` - Node maintenance procedure
+- `/runbook maintenance [node]` - Node maintenance procedure
 - `/runbook backup` - Backup procedures
 - `/runbook disaster-recovery` or `/runbook dr` - DR procedures
 - `/runbook service-restart [service]` - Restart specific service
 - `/runbook upgrade [component]` - Upgrade procedure
+- `/runbook patching` - Routine patching procedure
 - `/runbook scale [component]` - Scaling procedure
 - `/runbook network [change-type]` - Network changes
+- `/runbook decommission [target]` - Retire a service or host
 - `/runbook security [task]` - Security procedures
 - `/runbook custom [title]` - Generate custom runbook

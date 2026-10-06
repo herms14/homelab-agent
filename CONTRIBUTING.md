@@ -40,11 +40,19 @@ When creating or modifying commands:
 - Provide example output
 - Document all arguments
 - Test with various scenarios
+- Keep commands generic: reference docs by **role** (see the Documentation Structure table in `CLAUDE.md.template`), never by a personal path
+- No real IPs, hostnames, domains, or secrets. Use `[placeholders]` and `10.0.x.x` example addresses
+- Commands that change anything should end with the Change Documentation Protocol steps
+- Never instruct the agent to read the **Sensitive** doc
+
+### Releases
+
+- Add an entry to `CHANGELOG.md` for every user-visible change
 
 ### Documentation
 
 - Keep README.md updated
-- Update COMMANDS.md for new features
+- Update docs/COMMANDS.md for new features
 - Include examples where helpful
 - Check spelling and grammar
 

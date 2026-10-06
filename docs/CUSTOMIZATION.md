@@ -1,149 +1,142 @@
 # Customization Guide
 
-> How to customize Homelab Agent for your infrastructure
+> How to adapt Homelab Agent to your infrastructure
 
 ---
 
 ## Overview
 
-The Homelab Agent adapts to your infrastructure through:
+You customize the agent in three places, in order of how often you should need them:
 
-1. **CLAUDE.md** - Describes your environment
-2. **Command files** - Modify behavior
-3. **Documentation structure** - What files to read
+1. **`CLAUDE.md`** - Describes your environment and where your docs live (almost everything)
+2. **Your docs** - The agent is only as good as the markdown it reads
+3. **Command files** - Change behavior or output format, or add new commands
+
+Command files contain no paths, IPs, or domains. They ask for docs by **role**, and `CLAUDE.md` answers. That way you can update the commands from upstream without losing your configuration.
 
 ---
 
-## Customizing CLAUDE.md
+## CLAUDE.md Sections
 
-This is the most important file. It tells Claude about your infrastructure.
+Start from [`CLAUDE.md.template`](../CLAUDE.md.template). Sections, and which commands use them:
 
-### Basic Template
+| Section | Purpose | Used by |
+|---------|---------|---------|
+| Overview | Cluster name, domain, timezone, SSH user | All |
+| Infrastructure Summary | Counts at a glance | homelab, lab-status |
+| **Documentation Structure** | Maps roles to file paths | All |
+| **Change Documentation Protocol** | What to update after any change | deploy-new, ip-find, lab-changelog, runbook, doc-sync |
+| **Task Coordination** | Multi-session rules | homelab, deploy-new, lab-changelog, runbook, doc-sync |
+| Network Architecture | VLANs, default VLAN, DNS, IP conventions | ip-find, deploy-new, capacity |
+| Proxmox Cluster | Nodes, storage, backups | lab-status, capacity, runbook |
+| Service Conventions | URL pattern, SSO, Docker paths | deploy-new, service-list |
+| Automation | Terraform / Ansible / CI | deploy-new |
+| **Retired Components** | What no longer exists | homelab, lab-status, ip-find, capacity, doc-sync |
+| **Known Gotchas** | Traps the agent must respect | troubleshoot, ip-find, deploy-new, runbook |
+| Behavioral Rules | Safety and style rules | All |
 
-```markdown
-# Homelab Context
+### Documentation Structure (doc roles)
 
-## Overview
+| Role | Typical content |
+|------|-----------------|
+| Index | Overview / navigation |
+| Network | VLANs, topology, DNS, remote access |
+| Proxmox | Nodes, VMs, LXCs, templates |
+| Storage | NAS, NFS, pools, backups |
+| Kubernetes | Optional |
+| Services | Service catalog |
+| IP Map | IP allocations |
+| Reverse Proxy | Traefik / Caddy / NPM conventions |
+| SSO | Authentik / Authelia |
+| Monitoring | Prometheus, Grafana, uptime |
+| Automation | Terraform / Ansible / CI |
+| Onboarding | Your new-service workflow |
+| Troubleshooting | Known issues |
+| Runbooks | Folder for saved runbooks |
+| Changelog | Change log |
+| Task Registry | Session coordination |
+| Sensitive | Credentials. Listed so the agent **never** reads it |
 
-**Cluster Name**: [YourClusterName]
-**Domain**: [yourdomain.xyz]
-**Owner**: [Your Name]
-**Documentation Location**: [This folder]
+Keep the role names as-is; change only the paths. Several roles can point at the same file if your docs are consolidated.
 
-## Infrastructure Summary
-
-| Component | Count | Notes |
-|-----------|-------|-------|
-| Proxmox Nodes | [X] | [Cluster name] |
-| Virtual Machines | [X] | Across all nodes |
-| Docker Services | [X] | Various hosts |
-| Kubernetes Nodes | [X] | [If applicable] |
-
-## Network Architecture
-
-### VLANs
-
-| VLAN | Name | Subnet | Purpose |
-|------|------|--------|---------|
-| 1 | Default | 192.168.1.0/24 | General |
-| 10 | Servers | 192.168.10.0/24 | Server VLAN |
-| 20 | Homelab | 192.168.20.0/24 | Lab equipment |
-
-### IP Conventions
-
-- Network equipment: .1-.10
-- Servers/VMs: .20-.100
-- Containers: .100-.150
-- DHCP: .200-.254
-
-## Documentation Structure
-
-| File/Folder | Purpose |
-|-------------|---------|
-| `network.md` | Network architecture |
-| `services.md` | Service catalog |
-| `ips.md` | IP allocations |
-| `proxmox.md` | Proxmox cluster |
-| `kubernetes.md` | K8s cluster |
-| `troubleshooting.md` | Known issues |
-| `changelog.md` | Change log |
-
-## Conventions
-
-### Service URLs
-- Pattern: `https://[service].[domain]`
-- Example: `https://grafana.yourdomain.xyz`
-
-### Authentication
-- Primary: [Authentik/Authelia/None]
-- SSO Provider: [Google/Azure/Local]
-
-### Docker
-- Compose location: `/srv/[service]/docker-compose.yml`
-- Data location: `/srv/[service]/data`
-- Config location: `/srv/[service]/config`
-
-### Terraform
-- Module location: `./modules/`
-- State: [Local/Remote]
-
-### Ansible
-- Inventory: `./inventory/hosts.yml`
-- Playbooks: `./playbooks/`
-```
-
-### Advanced CLAUDE.md
-
-For complex environments, add more sections:
+### Retired Components
 
 ```markdown
-## Proxmox Cluster
-
-### Nodes
-
-| Node | IP | Role | CPU | RAM | Storage |
-|------|-----|------|-----|-----|---------|
-| node01 | 192.168.20.20 | Primary | 24 | 64GB | 1TB NVMe |
-| node02 | 192.168.20.21 | Secondary | 20 | 48GB | 500GB SSD |
-
-### Storage Pools
-
-| Pool | Type | Location | Size |
-|------|------|----------|------|
-| local-lvm | LVM | Node local | Varies |
-| nfs-data | NFS | NAS | 4TB |
-
-## Kubernetes Cluster
-
-### Architecture
-
-- Distribution: [kubeadm/k3s/RKE]
-- CNI: [Calico/Flannel/Cilium]
-- Ingress: [Traefik/Nginx/Contour]
-
-### Nodes
-
-| Name | Role | IP |
-|------|------|-----|
-| k8s-cp-01 | Control | 192.168.20.50 |
-| k8s-w-01 | Worker | 192.168.20.61 |
-
-## Automation
-
-### Terraform Modules
-
-| Module | Purpose |
-|--------|---------|
-| `linux-vm` | Provision Linux VMs |
-| `lxc` | Provision LXC containers |
-
-### Ansible Roles
-
-| Role | Purpose |
-|------|---------|
-| `docker` | Install Docker |
-| `common` | Base configuration |
+| Component | Retired | Notes |
+|-----------|---------|-------|
+| Kubernetes cluster | 2026-05-01 | 9 VMs deleted, IPs 10.0.20.50-.70 freed |
+| Hyper-V host | 2026-03-12 | Workloads moved to Proxmox |
 ```
+
+Effects: dashboards show `n/a`, `/ip-find` treats the IPs as free, `/doc-sync retired` finds docs that still describe them as active.
+
+### Known Gotchas
+
+One line each, specific and actionable:
+
+```markdown
+- NAS eth0 (10.0.20.30) is dead. Always use eth1 (10.0.20.31) for NFS, UI, SNMP.
+- After recreating an LXC, flush ARP on every node: `ip neigh flush dev vmbr0 <IP>`.
+- GitLab VM disk filled once from container logs; keep Docker log rotation on.
+- Never auto-patch the backup server or the Ansible controller.
+```
+
+`/troubleshoot add` will offer to append new ones.
+
+---
+
+## Change Documentation Protocol and Task Registry
+
+These two conventions keep docs truthful when Claude makes changes for you, and keep parallel sessions from colliding.
+
+**Protocol (after every change):** Changelog entry → update the doc that owns the fact → bump `updated:` frontmatter → update the Task Registry.
+
+**Task Registry:** a markdown file with In Progress / Blocked / Pending / Completed tables. Sessions check it before starting, mark tasks `🔄 In Progress` with a timestamp, and close them with `✅ Completed` and a note. Starters for both files are in [`templates/`](../templates/).
+
+Don't want them? Remove the Changelog and Task Registry rows from Documentation Structure and delete the two sections from `CLAUDE.md`. Commands skip what isn't configured.
+
+---
+
+## Documentation Layout Options
+
+### Flat
+
+```
+docs/
+├── CLAUDE.md
+├── network.md
+├── proxmox.md
+├── services.md
+├── ip-map.md
+└── troubleshooting.md
+```
+
+### Folders
+
+```
+docs/
+├── CLAUDE.md
+├── infrastructure/{network,proxmox,storage}.md
+├── services/catalog.md
+└── operations/{ip-map,troubleshooting}.md
+```
+
+### Numbered Notes (Obsidian style)
+
+```
+Homelab/
+├── CLAUDE.md
+├── 00 - Index.md
+├── 01 - Network Architecture.md
+├── 02 - Proxmox Cluster.md
+├── 07 - Deployed Services.md
+├── 10 - IP Address Map.md
+├── 12 - Troubleshooting.md
+├── Homelab Changelog.md
+└── Task Registry.md
+```
+
+In every case, only the Documentation Structure table changes.
 
 ---
 
@@ -151,214 +144,70 @@ For complex environments, add more sections:
 
 ### Modify Existing Commands
 
-Edit files in `.claude/commands/` to change behavior:
+Edit `.claude/commands/[command].md`. Common tweaks:
 
-**Example: Change default VLAN**
+- Add a service category in `service-list.md`
+- Add runbook types in `runbook.md`
+- Change capacity thresholds in `capacity.md`
+- Replace the Traefik/Authentik examples in `deploy-new.md` with Caddy/Authelia
 
-In `ip-find.md`, change:
-```markdown
-- `/ip-find next` - Next available in default VLAN (20)
-```
-To your default VLAN.
+Keep personal values (IPs, domain, hostnames) in `CLAUDE.md`, not in command files, so upstream updates merge cleanly.
 
-**Example: Add service category**
+### Create a Custom Command
 
-In `service-list.md`, add to categories:
-```markdown
-### Service Categories
-
-1. **Media Stack** - ...
-2. **Core Infrastructure** - ...
-3. **Your New Category** - Description
-```
-
-### Create Custom Commands
-
-Add new `.md` files to `.claude/commands/`:
+Add a new `.md` file to `.claude/commands/`:
 
 ```markdown
-# My Custom Command
+# My Command
 
-Description of what it does.
+One-line description.
 
 ## Instructions
 
-Step-by-step instructions for Claude...
+What Claude should do.
 
-## Data Sources
+### Data Sources
 
-Read these files:
-- `path/to/file1.md`
-- `path/to/file2.md`
+Read `CLAUDE.md` first. Then, using its Documentation Structure table, read:
+- **Services** - ...
+- **IP Map** - ...
 
-## Output Format
+Never open the doc listed under the **Sensitive** role.
 
-Template for output...
+### Output Format
+
+[template]
 
 ## Arguments
 
 - `/my-command` - Default behavior
-- `/my-command arg` - With argument
+- `/my-command [arg]` - With argument
 ```
+
+If your command changes anything, end it with the Change Documentation Protocol steps.
 
 ---
 
-## Documentation Structure Options
+## Examples
 
-### Option 1: Flat Structure
+### Single Node, Docker Only
 
-```
-docs/
-├── CLAUDE.md
-├── network.md
-├── services.md
-├── ips.md
-├── proxmox.md
-└── troubleshooting.md
-```
+Fill in Overview, Network, Services, IP Map. Leave out Kubernetes, Automation, Task Registry. `/capacity` and `/lab-status` adapt to one node.
 
-Update `CLAUDE.md`:
-```markdown
-## Documentation Structure
+### Lab That Retired Kubernetes
 
-| File | Purpose |
-|------|---------|
-| `network.md` | Network docs |
-| `services.md` | Services |
-```
+Add Kubernetes to Retired Components. Every K8s section disappears from reports, and `/ip-find` reclaims its IPs.
 
-### Option 2: Folder Structure
+### Multi-Site
 
-```
-docs/
-├── CLAUDE.md
-├── infrastructure/
-│   ├── network.md
-│   ├── proxmox.md
-│   └── kubernetes.md
-├── services/
-│   ├── catalog.md
-│   └── media-stack.md
-└── operations/
-    ├── ips.md
-    └── troubleshooting.md
-```
-
-Update `CLAUDE.md`:
-```markdown
-## Documentation Structure
-
-| Path | Purpose |
-|------|---------|
-| `infrastructure/network.md` | Network |
-| `infrastructure/proxmox.md` | Proxmox |
-| `services/catalog.md` | Service catalog |
-| `operations/ips.md` | IP allocations |
-```
-
-### Option 3: Numbered Files (Wiki-style)
-
-```
-docs/
-├── CLAUDE.md
-├── 00 - Index.md
-├── 01 - Network Architecture.md
-├── 02 - Proxmox Cluster.md
-├── 03 - Services.md
-└── 10 - IP Address Map.md
-```
-
-Update command files to reference numbered paths.
-
----
-
-## Customization Examples
-
-### For Single-Node Setup
-
-Simplify `CLAUDE.md`:
-```markdown
-## Infrastructure
-
-- Single Proxmox host
-- 10 Docker services
-- No Kubernetes
-
-## Documentation
-
-| File | Purpose |
-|------|---------|
-| `services.md` | All services |
-| `ips.md` | IP allocations |
-```
-
-### For Kubernetes-Focused Lab
-
-Emphasize K8s in `CLAUDE.md`:
-```markdown
-## Primary Focus: Kubernetes
-
-### Cluster Details
-- 3 control plane nodes
-- 5 worker nodes
-- ArgoCD for GitOps
-- Prometheus/Grafana monitoring
-
-### Namespaces
-| Namespace | Purpose |
-|-----------|---------|
-| media | Media applications |
-| monitoring | Observability |
-| default | General workloads |
-```
-
-### For Multi-Site Setup
-
-Add site context:
-```markdown
-## Sites
-
-### Site A - Primary
-- Location: Home
-- Proxmox cluster: 3 nodes
-- VLAN: 10.0.10.0/24
-
-### Site B - Remote
-- Location: Colo
-- Single server
-- VLAN: 10.0.20.0/24
-
-### Site Connectivity
-- VPN: WireGuard
-- Primary link: 192.168.100.0/24
-```
+Add a `## Sites` section to `CLAUDE.md` with each site's subnets and link type (WireGuard, Tailscale). Commands will include the site in IP and placement answers.
 
 ---
 
 ## Tips
 
-1. **Be specific** - The more detail in CLAUDE.md, the better
-2. **Keep paths accurate** - Commands read files by path
-3. **Use consistent naming** - Makes searching easier
-4. **Document conventions** - Helps generate correct code
-5. **Update regularly** - Keep CLAUDE.md current
-
----
-
-## Troubleshooting
-
-### Commands not finding files
-
-- Check paths in CLAUDE.md
-- Ensure files exist at specified locations
-- Use relative paths from CLAUDE.md location
-
-### Wrong output format
-
-- Check command file for output template
-- Modify template to match your preferences
-
-### Missing features
-
-- Add relevant sections to CLAUDE.md
-- Create custom commands for specific needs
+1. **Be specific** - The more facts in docs, the fewer guesses
+2. **One owner per fact** - Each fact lives in one doc; others link to it
+3. **Record removals** - Retired Components matters as much as inventory
+4. **Write down every trap** - Known Gotchas saves you from repeat outages
+5. **Run `/doc-sync` monthly**

@@ -4,20 +4,25 @@ Main menu and status dashboard for homelab infrastructure management.
 
 ## Instructions
 
-Display the homelab agent welcome screen with infrastructure summary and available commands.
+Display the homelab agent welcome screen with infrastructure summary, open tasks, alerts, and available commands.
 
 ### Data Sources
 
-Read these files for context:
-- `07 HomeLab Things/Claude Managed Homelab/00 - Homelab Index.md` - Main index
-- `07 HomeLab Things/Claude Managed Homelab/02 - Proxmox Cluster.md` - Cluster info
-- `07 HomeLab Things/Claude Managed Homelab/07 - Deployed Services.md` - Services
+Read `CLAUDE.md` first. Then use its **Documentation Structure** table to find and read these docs by role:
+- **Index** - Main overview
+- **Proxmox** - Nodes, VMs, LXCs
+- **Services** - Service catalog
+- **Network** - VLAN count
+- **Task Registry** - Open / blocked tasks (if present)
+- **Changelog** - Most recent entries (if present)
+
+Never open the doc listed under the **Sensitive** role.
 
 ### Output Format
 
 ```
 ╭──────────────────────────────────────────────────────────────────╮
-│  🏠 Homelab Agent - MorpheusCluster                              │
+│  🏠 Homelab Agent - [Cluster Name]                               │
 ╰──────────────────────────────────────────────────────────────────╯
 
 Welcome! I'm your homelab infrastructure assistant.
@@ -26,8 +31,15 @@ Welcome! I'm your homelab infrastructure assistant.
 │  📊 Infrastructure Summary                                      │
 ├─────────────────────────────────────────────────────────────────┤
 │  Proxmox Nodes: [X]    │  VMs: [X]    │  LXCs: [X]             │
-│  K8s Nodes: [X]        │  Docker Services: [X]+                │
-│  VLANs: [X]            │  Storage: [X] GB                      │
+│  Docker Services: [X]+ │  VLANs: [X]  │  Storage: [X] TB       │
+│  K8s Nodes: [X or "n/a"]                                        │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  🗂️ Task Registry                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  🔄 In Progress: [X]   ⏸️ Blocked: [X]   📋 Pending: [X]         │
+│  • [Most recent in-progress or blocked task]                   │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -45,34 +57,38 @@ Welcome! I'm your homelab infrastructure assistant.
 └──────────────────┴──────────────────────────────────────────────┘
 
 ⚠️  Alerts:
-  • [List any recent changes, pending updates, or issues]
-  • [Check for stale documentation]
-  • [Note any capacity warnings]
+  • [Recent changes from the Changelog]
+  • [Blocked tasks from the Task Registry]
+  • [Stale documentation]
+  • [Capacity warnings]
 
 💡 Tip: Run /lab-status for a comprehensive infrastructure report.
 
 What would you like to do?
 ```
 
+Omit the Task Registry box if no Task Registry doc is configured. Show `n/a` for any component listed under **Retired Components** in `CLAUDE.md`.
+
 ### Alert Detection
 
 Check for:
-1. **Recent changes** - Files modified in last 24 hours in homelab folder
-2. **Stale docs** - Files not updated in 30+ days
-3. **Capacity** - Note if any resource > 80% utilized
-4. **TODOs** - List incomplete TODO items from index
+1. **Recent changes** - Latest Changelog entries, plus homelab docs modified in the last 24 hours
+2. **Blocked tasks** - `⏸️ Blocked` items in the Task Registry
+3. **Stale tasks** - `🔄 In Progress` items older than 7 days (possibly abandoned by another session)
+4. **Stale docs** - Files whose `updated:` frontmatter (or modified time) is 30+ days old
+5. **Capacity** - Any resource > 80% utilized
+6. **Gotchas** - Anything under **Known Gotchas** in `CLAUDE.md` that is currently relevant
 
 ### Quick Stats Extraction
 
-From Proxmox Cluster doc:
-- Count nodes, VMs, LXCs
-- Note cluster health
+From the Proxmox doc:
+- Count nodes, VMs (excluding templates), LXCs
+- Note cluster/quorum health
 
-From Deployed Services:
-- Count total services
-- Group by category
+From the Services doc:
+- Count total services, grouped by category
 
-From Network Architecture:
+From the Network doc:
 - Count VLANs
 
 ## Arguments
@@ -80,3 +96,4 @@ From Network Architecture:
 - `/homelab` - Show main menu with summary
 - `/homelab quick` - Just show available commands
 - `/homelab alerts` - Focus on alerts only
+- `/homelab tasks` - Show the Task Registry summary only

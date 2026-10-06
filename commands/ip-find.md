@@ -8,22 +8,17 @@ Search and manage IP address allocations in the homelab network.
 
 ### Data Sources
 
-Read these files:
-- `07 HomeLab Things/Claude Managed Homelab/10 - IP Address Map.md` - IP allocations
-- `07 HomeLab Things/Claude Managed Homelab/01 - Network Architecture.md` - VLAN info
+Read `CLAUDE.md` first: VLANs, default VLAN, DNS server, IP Allocation Conventions, **Retired Components**, and **Known Gotchas**. Then, using its **Documentation Structure** table, read:
+- **IP Map** - IP allocations
+- **Network** - VLAN details
+- **Proxmox** - Guest IPs that may be missing from the IP Map
 
-### VLAN Reference
+### Rules
 
-| VLAN ID | Name | Subnet | Purpose |
-|---------|------|--------|---------|
-| 1 | Default | 192.168.0.0/24 | General network |
-| 10 | Internal | 192.168.10.0/24 | Internal services |
-| 20 | Homelab | 192.168.20.0/24 | Lab infrastructure |
-| 30 | IoT | 192.168.30.0/24 | IoT devices |
-| 40 | Production | 192.168.40.0/24 | Production services |
-| 50 | Guest | 192.168.50.0/24 | Guest network |
-| 60 | Sonos | 192.168.60.0/24 | Audio devices |
-| 90 | Management | 192.168.90.0/24 | Network management |
+- An IP is **in use** if it appears in the IP Map, the Proxmox doc, the Services doc, or the Known Gotchas list (e.g. a dead NIC that must never be reused).
+- IPs belonging to **Retired Components** are free unless re-allocated since.
+- If two docs disagree, or the same IP is assigned twice, flag it as a ⚠️ conflict.
+- If the user can run commands, suggest a live check before using an IP: `ping -c 2 [ip]` and `arping -c 2 [ip]` (or `ip neigh | grep [ip]` on a Proxmox node).
 
 ### Output Format - Find Available
 
@@ -36,32 +31,34 @@ Read these files:
 
 | IP Address | Device/Service | Type | Notes |
 |------------|----------------|------|-------|
-| 192.168.20.20 | node01 | Proxmox | Primary node |
-| 192.168.20.21 | node02 | Proxmox | Secondary |
-| 192.168.20.22 | node03 | Proxmox | Tertiary |
-| 192.168.20.31 | Synology NAS | Storage | Main NAS |
-| 192.168.20.50 | k8s-cp-01 | K8s | Control plane |
+| 10.0.20.1 | Gateway | Network | |
+| 10.0.20.11 | node01 | Proxmox | Primary node |
+| 10.0.20.12 | node02 | Proxmox | |
+| 10.0.20.30 | NAS (eth0) | Storage | ⚠️ Do not use (Known Gotcha) |
 | ... | ... | ... | ... |
 
-### Reserved Ranges
+### Reserved Ranges (from CLAUDE.md conventions)
 
 | Range | Purpose |
 |-------|---------|
-| .1-.19 | Network infrastructure |
-| .20-.30 | Proxmox nodes |
-| .31-.40 | Storage devices |
-| .50-.60 | K8s control plane |
-| .61-.80 | K8s workers |
+| .1-.10 | Network infrastructure |
+| .20-.30 | Physical servers |
 | .200-.254 | DHCP pool |
+
+### Freed by Retired Components
+
+| Range | Previously |
+|-------|-----------|
+| [.50-.70] | [Kubernetes cluster, retired YYYY-MM-DD] |
 
 ### Next Available IPs
 
-✅ **Recommended**: 192.168.20.[X]
+✅ **Recommended**: [subnet].[X]
 
 Available in sequence:
-1. 192.168.20.[X]
-2. 192.168.20.[Y]
-3. 192.168.20.[Z]
+1. [subnet].[X]
+2. [subnet].[Y]
+3. [subnet].[Z]
 
 ### Usage Summary
 
@@ -75,9 +72,9 @@ Available in sequence:
 ### Output Format - Check IP
 
 ```markdown
-# 🔍 IP Check: 192.168.20.100
+# 🔍 IP Check: [ip]
 
-**Status**: ✅ Available / 🔴 In Use
+**Status**: ✅ Available / 🔴 In Use / ⚠️ Conflict
 
 ## If In Use:
 | Property | Value |
@@ -85,15 +82,15 @@ Available in sequence:
 | Device | [Name] |
 | Type | [VM/LXC/Physical] |
 | Purpose | [Description] |
-| Added | [Date] |
+| Source | [Which doc(s)] |
 
 ## If Available:
 This IP is available for use.
 
-**VLAN**: 20 - Homelab
-**Subnet**: 192.168.20.0/24
-**Gateway**: 192.168.20.1
-**DNS**: 192.168.90.53
+**VLAN**: [ID] - [Name]
+**Subnet**: [subnet]
+**Gateway**: [gateway]
+**DNS**: [DNS server from CLAUDE.md]
 ```
 
 ### Output Format - All VLANs Summary
@@ -103,32 +100,41 @@ This IP is available for use.
 
 | VLAN | Name | Subnet | Allocated | Available | Util% |
 |------|------|--------|-----------|-----------|-------|
-| 1 | Default | 192.168.0.0/24 | [X] | [Y] | [Z]% |
-| 10 | Internal | 192.168.10.0/24 | [X] | [Y] | [Z]% |
-| 20 | Homelab | 192.168.20.0/24 | [X] | [Y] | [Z]% |
-| 30 | IoT | 192.168.30.0/24 | [X] | [Y] | [Z]% |
+| [10] | [Management] | [subnet] | [X] | [Y] | [Z]% |
+| [20] | [Servers] | [subnet] | [X] | [Y] | [Z]% |
 | ... | ... | ... | ... | ... | ... |
+
+## ⚠️ Conflicts
+
+| IP | Claimed By |
+|----|------------|
+| [ip] | [device A], [device B] |
 
 ## Recommendations
 
 - VLAN with most space: [Name]
-- Suggested for new VMs: VLAN 20 (Homelab)
-- Suggested for IoT: VLAN 30 (IoT)
+- Suggested for new VMs: [default VLAN]
 ```
 
-### Update IP Map
+### Reserving an IP
 
-When reserving an IP, suggest adding to `10 - IP Address Map.md`:
-```markdown
-| 192.168.20.[X] | [New Service] | [Type] | [Notes] |
-```
+When reserving, follow the Change Documentation Protocol in `CLAUDE.md`:
+1. Add the row to the **IP Map** doc:
+   ```markdown
+   | [ip] | [New Service] | [Type] | [Notes] |
+   ```
+2. Add a Changelog entry (`Added` category)
+3. Update `updated:` frontmatter on modified docs
+
+Ask for confirmation before writing.
 
 ## Arguments
 
 - `/ip-find` - Show all VLANs summary
-- `/ip-find vlan20` or `/ip-find homelab` - Specific VLAN
-- `/ip-find check 192.168.20.100` - Check if IP is in use
-- `/ip-find next` - Next available in default VLAN (20)
+- `/ip-find vlan20` or `/ip-find [vlan-name]` - Specific VLAN
+- `/ip-find check [ip]` - Check if IP is in use
+- `/ip-find next` - Next available in the default VLAN from CLAUDE.md
 - `/ip-find next vlan30` - Next available in specific VLAN
-- `/ip-find reserve 192.168.20.100 "Service Name"` - Reserve and document
+- `/ip-find reserve [ip] "Service Name"` - Reserve and document
 - `/ip-find search [term]` - Search allocations by name
+- `/ip-find conflicts` - Only show duplicate / conflicting allocations

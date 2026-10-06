@@ -1,286 +1,233 @@
 # Installation Guide
 
-> Complete guide to installing and configuring Homelab Agent
+> Install and configure Homelab Agent
 
 ## Prerequisites
 
-Before installing, ensure you have:
-
 - ✅ **Claude Code** installed ([Get it here](https://claude.ai/code))
-- ✅ **Homelab documentation** in markdown format
-- ✅ **Git** (optional, for cloning)
-- ✅ Basic command line familiarity
+- ✅ **Homelab documentation** in markdown format (Obsidian vault, Git repo, or plain folder)
+- ✅ **Git** (optional, for cloning and updating)
 
 ---
 
 ## Installation Methods
 
-### Method 1: Git Clone (Recommended)
+### Method 1: Clone Beside Your Docs (Recommended)
+
+Keeps the agent repo separate from your own `.claude/` settings, so updates never overwrite them.
 
 ```bash
-# Navigate to your documentation root
 cd "path/to/your/homelab/docs"
+git clone https://github.com/herms14/homelab-agent .homelab-agent
 
-# Clone the repository into .claude folder
+mkdir -p .claude/commands
+cp .homelab-agent/commands/*.md .claude/commands/
+cp .homelab-agent/CLAUDE.md.template ./CLAUDE.md
+
+# Optional but recommended: starter docs the commands maintain
+cp ".homelab-agent/templates/Homelab Changelog.md" .
+cp ".homelab-agent/templates/Task Registry.md" .
+```
+
+Windows PowerShell equivalent:
+
+```powershell
+cd "C:\path\to\your\homelab\docs"
+git clone https://github.com/herms14/homelab-agent .homelab-agent
+New-Item -ItemType Directory -Force .claude\commands | Out-Null
+Copy-Item .homelab-agent\commands\*.md .claude\commands\
+Copy-Item .homelab-agent\CLAUDE.md.template .\CLAUDE.md
+Copy-Item ".homelab-agent\templates\Homelab Changelog.md", ".homelab-agent\templates\Task Registry.md" .
+```
+
+If your docs folder is itself a Git repo, add `.homelab-agent/` to its `.gitignore`.
+
+### Method 2: Clone as `.claude` (Fresh Docs Folder Only)
+
+If you have no existing `.claude/` folder, you can clone straight into it. Claude Code finds `commands/` inside it.
+
+```bash
+cd "path/to/your/homelab/docs"
 git clone https://github.com/herms14/homelab-agent .claude
-
-# Copy CLAUDE.md template to root
 cp .claude/CLAUDE.md.template ./CLAUDE.md
 ```
 
-### Method 2: Manual Download
+### Method 3: Manual Download
 
-1. **Download** the repository as ZIP from GitHub
-2. **Extract** the contents
-3. **Copy** the `commands/` folder to `.claude/commands/` in your docs
-4. **Copy** `CLAUDE.md.template` to your docs root as `CLAUDE.md`
+1. Download the repository ZIP from GitHub and extract it
+2. Copy `commands/*.md` to `.claude/commands/` in your docs
+3. Copy `CLAUDE.md.template` to your docs root as `CLAUDE.md`
+4. Optionally copy the files in `templates/` to your docs
 
-### Method 3: Copy Individual Commands
+### Method 4: Pick Individual Commands
 
-If you only want specific commands:
-
-1. Create `.claude/commands/` folder in your docs
-2. Copy only the command files you want:
-   - `homelab.md` - Main menu
-   - `lab-status.md` - Status reports
-   - `service-list.md` - Service catalog
-   - etc.
+Copy only the command files you want into `.claude/commands/`. Each command works on its own; they just reference each other in suggestions.
 
 ---
 
 ## Folder Structure After Installation
 
-Your documentation should look like this:
-
 ```
 your-homelab-docs/
 ├── .claude/
-│   ├── commands/
-│   │   ├── homelab.md
-│   │   ├── lab-status.md
-│   │   ├── service-list.md
-│   │   ├── ip-find.md
-│   │   ├── deploy-new.md
-│   │   ├── troubleshoot.md
-│   │   ├── lab-changelog.md
-│   │   ├── runbook.md
-│   │   ├── capacity.md
-│   │   └── doc-sync.md
-│   └── settings.local.json
-├── CLAUDE.md                    # ⬅️ Important! Must be in docs root
-├── network.md                   # Your network documentation
-├── services.md                  # Your service catalog
-├── ips.md                       # Your IP allocations
-└── ... (your other docs)
+│   └── commands/
+│       ├── homelab.md
+│       ├── lab-status.md
+│       ├── service-list.md
+│       ├── ip-find.md
+│       ├── deploy-new.md
+│       ├── troubleshoot.md
+│       ├── lab-changelog.md
+│       ├── runbook.md
+│       ├── capacity.md
+│       └── doc-sync.md
+├── .homelab-agent/              # Method 1 only (for updates)
+├── CLAUDE.md                    # ⬅️ Must be in the docs root
+├── Homelab Changelog.md         # Optional starter
+├── Task Registry.md             # Optional starter
+├── network.md                   # Your docs...
+├── services.md
+├── ip-map.md
+└── ...
 ```
 
 ---
 
 ## Configuration
 
-### Step 1: Customize CLAUDE.md
+### Step 1: Fill In CLAUDE.md
 
-Edit `CLAUDE.md` in your docs root. This file tells Claude about your infrastructure:
+The most important section is **Documentation Structure**. Commands look up docs by *role*, so map each role to your actual file:
 
 ```markdown
-# Homelab Context
-
-## Infrastructure Overview
-
-**Cluster Name**: YourClusterName
-**Domain**: yourdomain.xyz
-**Primary VLAN**: 20 (192.168.20.0/24)
-
-## Proxmox Nodes
-
-| Node | IP | Specs |
-|------|-----|-------|
-| node01 | 192.168.20.20 | 24 cores, 64GB RAM |
-| node02 | 192.168.20.21 | 20 cores, 48GB RAM |
-
-## Documentation Structure
-
-| File | Purpose |
-|------|---------|
-| `network.md` | Network architecture, VLANs |
-| `proxmox.md` | Proxmox cluster details |
-| `services.md` | Deployed services catalog |
-| `ips.md` | IP address allocations |
-| `troubleshooting.md` | Known issues and fixes |
-
-## Conventions
-
-- IP Range for VMs: 192.168.20.100-199
-- Service URLs: https://[service].yourdomain.xyz
-- Auth: Authentik SSO for most services
+| Role | Path | Purpose |
+|------|------|---------|
+| Network | `infrastructure/network.md` | VLANs, DNS |
+| Proxmox | `infrastructure/proxmox.md` | Nodes, VMs, LXCs |
+| Services | `services/catalog.md` | Service catalog |
+| IP Map | `operations/ip-map.md` | IP allocations |
+| Troubleshooting | `operations/troubleshooting.md` | Known issues |
+| Changelog | `Homelab Changelog.md` | Change log |
+| Task Registry | `Task Registry.md` | Session coordination |
+| Sensitive | `secrets/credentials.md` | Never read |
 ```
 
-### Step 2: Configure Permissions (Optional but Recommended)
+Then fill in VLANs, nodes, conventions, **Retired Components**, and **Known Gotchas**. See [CUSTOMIZATION.md](./CUSTOMIZATION.md).
 
-To avoid permission prompts, add to `~/.claude/settings.json`:
+### Step 2: Permissions (Optional)
 
-**Windows**: `%USERPROFILE%\.claude\settings.json`
-**Mac/Linux**: `~/.claude/settings.json`
+To reduce permission prompts, add to your Claude Code settings (`~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows):
 
 ```json
 {
   "permissions": {
     "allow": [
       "Read(path/to/your/docs/**)",
-      "Write(path/to/your/docs/**)",
       "Edit(path/to/your/docs/**)",
+      "Write(path/to/your/docs/**)",
       "Glob(**)",
       "Grep(**)"
+    ],
+    "deny": [
+      "Read(path/to/your/docs/secrets/**)"
     ]
   }
 }
 ```
 
-### Step 3: Verify Installation
+A `deny` rule on your credentials file backs up the **Sensitive** role in `CLAUDE.md`.
+
+### Step 3: Live Data (Optional)
+
+`/lab-status live`, `/capacity`, and `/doc-sync live` can run read-only commands on a Proxmox node if Claude Code can reach one over SSH (for example `ssh node01 pvesh get /cluster/resources`). Set up key-based SSH yourself; the agent never needs passwords. Without SSH, everything works from docs alone.
+
+### Step 4: Verify
 
 ```bash
-# Navigate to docs
 cd "path/to/your/docs"
-
-# Start Claude Code
 claude
-
-# Test the installation
 > /homelab
 ```
 
-You should see the main menu with all available commands.
+You should see the main menu with your infrastructure summary.
 
 ---
 
 ## Documentation Requirements
 
-The agent works best when your documentation includes:
+### Core (recommended)
 
-### Required Files (Recommended)
-
-| File | What to Include |
+| Role | What to Include |
 |------|-----------------|
-| **Network docs** | VLANs, subnets, IP ranges |
-| **Service catalog** | All services with URLs, ports |
-| **IP allocations** | Device-to-IP mappings |
+| **Network** | VLANs, subnets, gateway, DNS |
+| **Services** | Every service with URL, host, port, auth |
+| **IP Map** | Device-to-IP mappings |
+| **Proxmox** | Nodes, VMs, LXCs, templates |
 
-### Optional Files (Enhanced Features)
+### Optional (unlock more features)
 
-| File | Enables |
+| Role | Enables |
 |------|---------|
-| **Troubleshooting guide** | `/troubleshoot` search |
-| **Terraform configs** | `/deploy-new` templates |
-| **Ansible playbooks** | `/deploy-new` patterns |
-| **Change log** | `/lab-changelog` tracking |
-
-### Example Documentation Structure
-
-```
-homelab-docs/
-├── infrastructure/
-│   ├── network-architecture.md
-│   ├── proxmox-cluster.md
-│   ├── kubernetes-cluster.md
-│   └── storage.md
-├── services/
-│   ├── deployed-services.md
-│   ├── media-stack.md
-│   └── monitoring.md
-├── operations/
-│   ├── ip-address-map.md
-│   ├── troubleshooting.md
-│   └── changelog.md
-├── automation/
-│   ├── terraform/
-│   └── ansible/
-└── CLAUDE.md
-```
+| **Troubleshooting** | `/troubleshoot` known-issue matching |
+| **Automation** / **Onboarding** | `/deploy-new` follows your patterns |
+| **Storage** | `/capacity` storage section |
+| **Changelog** | `/lab-changelog`, recent-activity alerts |
+| **Task Registry** | Multi-session coordination, task alerts |
+| **Runbooks** | `/runbook` saves and reuses procedures |
 
 ---
 
-## Platform-Specific Notes
+## Platform Notes
 
-### Windows
-
-- Use forward slashes `/` in paths
-- Settings file: `C:\Users\YourName\.claude\settings.json`
-- Example path: `C:/Users/YourName/Documents/HomeLabDocs/**`
-
-### macOS
-
-- Settings file: `~/.claude/settings.json`
-- Example path: `/Users/YourName/Documents/HomeLabDocs/**`
-
-### Linux
-
-- Settings file: `~/.claude/settings.json`
-- Example path: `/home/YourName/docs/homelab/**`
+| OS | Settings file | Path style in permissions |
+|----|---------------|---------------------------|
+| Windows | `C:\Users\You\.claude\settings.json` | `C:/Users/You/Docs/Homelab/**` |
+| macOS | `~/.claude/settings.json` | `/Users/you/Docs/Homelab/**` |
+| Linux | `~/.claude/settings.json` | `/home/you/docs/homelab/**` |
 
 ---
 
 ## Troubleshooting Installation
 
 ### Commands Not Showing
+1. Start `claude` from the docs root
+2. Check `.claude/commands/*.md` exists (not `.claude/commands/commands/`)
+3. Restart the Claude Code session
 
-**Problem**: Slash commands don't appear
-
-**Solutions**:
-1. Ensure you're in the docs directory when running `claude`
-2. Check that `.claude/commands/` folder exists
-3. Verify files have `.md` extension
-4. Restart Claude Code session
-
-### Permission Denied Errors
-
-**Problem**: Claude can't read/write files
-
-**Solutions**:
-1. Add permissions to `~/.claude/settings.json`
-2. When prompted, select "Always allow for this directory"
-3. Check file/folder permissions in your OS
+### Commands Can't Find Your Docs
+1. Check the paths in the **Documentation Structure** table
+2. Paths are relative to the folder containing `CLAUDE.md`
+3. Keep the role names unchanged (Network, Services, IP Map, ...)
 
 ### CLAUDE.md Not Being Read
-
-**Problem**: Claude doesn't know your infrastructure
-
-**Solutions**:
-1. Ensure `CLAUDE.md` is in docs ROOT (not in `.claude/`)
-2. Check file isn't named `claude.md` (case matters)
-3. Verify proper markdown formatting
+1. It must be in the docs ROOT, not inside `.claude/`
+2. The name is case-sensitive: `CLAUDE.md`
 
 ---
 
 ## Updating
 
-### Via Git
+### Method 1 installs
+
+```bash
+cd "path/to/your/docs/.homelab-agent"
+git pull
+cp commands/*.md ../.claude/commands/
+```
+
+### Method 2 installs
 
 ```bash
 cd "path/to/your/docs/.claude"
-git pull origin main
+git pull
 ```
 
-### Manual Update
-
-1. Download latest release from GitHub
-2. Replace files in `.claude/commands/`
-3. Check release notes for `CLAUDE.md` changes
-
----
-
-## Next Steps
-
-After installation:
-
-1. **Customize CLAUDE.md** for your infrastructure
-2. **Run `/homelab`** to see the main menu
-3. **Try `/lab-status`** for a status report
-4. **Explore `/service-list`** to see your services
+After updating, read [CHANGELOG.md](../CHANGELOG.md) and compare `CLAUDE.md.template` with your `CLAUDE.md` for new sections (v1.1.0 added Change Documentation Protocol, Task Coordination, Retired Components, Known Gotchas, and doc roles).
 
 ---
 
 ## Getting Help
 
-- 📖 [Full Documentation](./COMMANDS.md)
+- 📖 [Command Reference](./COMMANDS.md)
 - 🐛 [Report Issues](https://github.com/herms14/homelab-agent/issues)
 - 💬 [Discussions](https://github.com/herms14/homelab-agent/discussions)

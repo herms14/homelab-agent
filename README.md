@@ -1,450 +1,266 @@
 # 🏠 Homelab Agent
 
-> **AI-powered homelab infrastructure management using Claude Code**
-
-Transform your homelab management with intelligent automation. This skill pack gives Claude Code the ability to monitor, manage, document, and deploy infrastructure in your homelab environment.
+> **A doc-driven homelab assistant for Claude Code: ten slash commands that read your markdown docs and help you run, change, and document your lab.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Compatible-blue)](https://claude.ai/code)
 [![Proxmox](https://img.shields.io/badge/Proxmox-Compatible-orange)](https://www.proxmox.com/)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-Compatible-326CE5)](https://kubernetes.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compatible-2496ED)](https://docker.com/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-Optional-326CE5)](https://kubernetes.io/)
+
+**Current version: 1.1.0** · See [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-## ✨ Features
+## ✨ Commands
 
-| Feature | Command | Description |
-|---------|---------|-------------|
-| 🏠 **Infrastructure Overview** | `/homelab` | Main dashboard with cluster status and alerts |
-| 📊 **Status Reports** | `/lab-status` | Comprehensive infrastructure health reports |
-| 📦 **Service Catalog** | `/service-list` | Complete service inventory with URLs |
-| 🔍 **IP Management** | `/ip-find` | Find available IPs, prevent conflicts |
-| 🚀 **Code Generator** | `/deploy-new` | Generate Terraform, Ansible, Docker code |
-| 🔧 **Troubleshooting** | `/troubleshoot` | Search guides and diagnose issues |
-| 📋 **Change Tracking** | `/lab-changelog` | Infrastructure audit trail |
-| 📖 **Runbook Generator** | `/runbook` | Operational procedure documentation |
-| 📈 **Capacity Planning** | `/capacity` | Resource utilization and planning |
-| 🔄 **Doc Verification** | `/doc-sync` | Keep documentation accurate |
+| Command | What it does |
+|---------|--------------|
+| `/homelab` | Main menu: infrastructure summary, open tasks, alerts, quick actions |
+| `/lab-status` | Full status report for nodes, guests, services, storage, network (docs or live `pvesh`) |
+| `/service-list` | Service catalog with URLs, hosts, ports, and auth, grouped by category |
+| `/ip-find` | Find free IPs per VLAN, check an IP, detect duplicate allocations, reserve and document |
+| `/deploy-new` | Generate LXC / Terraform / Docker Compose / reverse proxy / SSO code plus a doc checklist |
+| `/troubleshoot` | Match symptoms against your known issues, recent changes, and gotchas; give diagnostics |
+| `/lab-changelog` | Add and browse changelog entries; detect undocumented changes; close matching tasks |
+| `/runbook` | Generate maintenance, patching, backup, DR, decommission, and custom runbooks |
+| `/capacity` | CPU / RAM / storage / IP headroom and best-node placement for a new guest |
+| `/doc-sync` | Find missing, conflicting, stale, or retired-but-still-mentioned facts and fix them |
 
----
-
-## 🎯 Who Is This For?
-
-This agent is designed for homelab enthusiasts running:
-
-- **Proxmox VE** clusters (single node or multi-node)
-- **Kubernetes** clusters (kubeadm, k3s, RKE, etc.)
-- **Docker** hosts with multiple services
-- **Infrastructure as Code** (Terraform, Ansible)
-- **Comprehensive documentation** in Obsidian or similar
-
-### Perfect For:
-
-- 🏗️ Managing complex multi-node clusters
-- 📝 Keeping documentation in sync with reality
-- 🔍 Finding available IPs across VLANs
-- 🚀 Quickly deploying new services
-- 🔧 Troubleshooting infrastructure issues
-- 📈 Planning capacity for new workloads
+Full reference: [docs/COMMANDS.md](docs/COMMANDS.md)
 
 ---
 
-## 🚀 Quick Start
+## 🧠 How It Works
+
+Homelab Agent is not a daemon or an API integration. It is a set of **prompt files** that Claude Code loads as slash commands. Each command tells Claude which of **your markdown docs** to read and what to produce.
+
+```
+          you type /ip-find next
+                   │
+                   ▼
+   .claude/commands/ip-find.md   ← instructions + output format
+                   │
+                   ▼
+        CLAUDE.md (your docs root)
+   ├── Documentation Structure   ← maps roles to your files
+   ├── VLANs, conventions        ← default VLAN, URL pattern, SSO...
+   ├── Retired Components        ← don't report these, IPs are free
+   └── Known Gotchas             ← traps to avoid (dead NICs, stale ARP...)
+                   │
+                   ▼
+   your docs: IP Map, Proxmox, Services, Network ...
+                   │
+                   ▼
+        answer + suggested doc edits
+```
+
+Three conventions make it work:
+
+1. **Doc roles.** Commands never hardcode file paths. They ask for the *IP Map*, *Services*, *Proxmox*, *Changelog* doc and so on, and `CLAUDE.md` tells them where each one lives. Missing roles are skipped.
+2. **Change Documentation Protocol.** Every change updates the Changelog, the doc that owns the fact, and `updated:` frontmatter, so your docs stay the source of truth.
+3. **Task Registry.** A shared markdown task list that lets several Claude Code sessions work on the same lab without stepping on each other.
+
+Optionally, commands such as `/lab-status`, `/capacity`, and `/doc-sync` can use read-only live commands (`pvesh`, `pvecm`, `pct config`) if Claude Code has shell access to a Proxmox node.
+
+---
+
+## 🚀 Install
 
 ### Prerequisites
 
-- [Claude Code](https://claude.ai/code) installed
-- Homelab documentation in markdown format
-- Basic command line familiarity
+- [Claude Code](https://claude.ai/code)
+- Homelab documentation in markdown (Obsidian vault, Git repo, plain folder)
 
-### Installation
+### Steps
 
-1. **Clone this repository** into your documentation folder:
+1. **Copy the commands** into your docs folder:
 
    ```bash
-   # Navigate to your documentation root
-   cd "path/to/your/docs"
-
-   # Clone into .claude folder
-   git clone https://github.com/herms14/homelab-agent .claude
+   cd "path/to/your/homelab/docs"
+   git clone https://github.com/herms14/homelab-agent .homelab-agent
+   mkdir -p .claude/commands
+   cp .homelab-agent/commands/*.md .claude/commands/
    ```
 
-   Or **copy manually**:
-   - Copy the `commands/` folder to `.claude/commands/`
-   - Copy `CLAUDE.md` to your docs root
+   Already have a `.claude/` folder? This copies only the command files and leaves your other settings alone.
 
-2. **Customize CLAUDE.md** for your environment (see [Customization](#-customization))
-
-3. **Start Claude Code**:
+2. **Create your context file**:
 
    ```bash
-   cd "path/to/your/docs"
+   cp .homelab-agent/CLAUDE.md.template ./CLAUDE.md
+   ```
+
+   Fill in the **Documentation Structure** table, VLANs, nodes, conventions, Retired Components, and Known Gotchas.
+
+3. **(Recommended) add the Changelog and Task Registry starters**:
+
+   ```bash
+   cp ".homelab-agent/templates/Homelab Changelog.md" .
+   cp ".homelab-agent/templates/Task Registry.md" .
+   ```
+
+4. **Run it**:
+
+   ```bash
    claude
+   > /homelab
    ```
 
-4. **Run your first command**:
-
-   ```
-   /homelab
-   ```
+Updating later: `cd .homelab-agent && git pull`, then copy `commands/*.md` again. Details and Windows notes: [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 ---
 
-## 📖 Available Commands
+## 🖥️ Example Output
 
-### Core Commands
-
-| Command | Description |
-|---------|-------------|
-| `/homelab` | 🏠 Main menu showing infrastructure summary and available actions |
-| `/lab-status` | 📊 Comprehensive status report for all infrastructure components |
-| `/service-list` | 📦 List all deployed services with URLs, ports, and auth methods |
-
-### Infrastructure Management
-
-| Command | Description |
-|---------|-------------|
-| `/ip-find` | 🔍 Find available IPs, check allocations, reserve addresses |
-| `/deploy-new` | 🚀 Generate deployment code (Terraform, Docker, Ansible) |
-| `/capacity` | 📈 Resource utilization analysis and capacity planning |
-
-### Operations & Documentation
-
-| Command | Description |
-|---------|-------------|
-| `/troubleshoot` | 🔧 Search troubleshooting guides and get diagnostic commands |
-| `/lab-changelog` | 📋 Log infrastructure changes for audit trail |
-| `/runbook` | 📖 Generate operational procedures and runbooks |
-| `/doc-sync` | 🔄 Verify documentation matches actual infrastructure |
-
----
-
-## 🏠 Main Dashboard
+### `/homelab`
 
 ```
 ╭──────────────────────────────────────────────────────────────────╮
-│  🏠 Homelab Agent - MorpheusCluster                              │
+│  🏠 Homelab Agent - MyCluster                                    │
 ╰──────────────────────────────────────────────────────────────────╯
 
-Infrastructure Summary:
-  • Proxmox Nodes: 3 (Healthy)
-  • VMs Running: 18
-  • K8s Nodes: 9
-  • Docker Services: 33+
+  Proxmox Nodes: 3 (+QDevice, quorate)  │  VMs: 5  │  LXCs: 13
+  Docker Services: 30+  │  VLANs: 7  │  K8s: n/a (retired)
 
-┌─────────────────────────────────────────────────────────────────┐
-│  📋 Quick Actions                                               │
-├──────────────────┬──────────────────────────────────────────────┤
-│  /lab-status     │  📊 Full infrastructure status               │
-│  /service-list   │  📦 List all services with URLs              │
-│  /ip-find        │  🔍 Find available IP addresses              │
-│  /deploy-new     │  🚀 Generate deployment code                 │
-│  /troubleshoot   │  🔧 Search troubleshooting guides            │
-└──────────────────┴──────────────────────────────────────────────┘
+  🗂️ Tasks: 🔄 1 in progress  ⏸️ 1 blocked  📋 4 pending
 
 ⚠️  Alerts:
-  • 2 services pending Watchtower update
-  • PBS backup completed 2 hours ago
+  • node02 RAM allocated at 86%
+  • Blocked: "install node_exporter on node03" (waiting on reboot window)
+  • services.md not updated in 41 days
 ```
 
----
-
-## 📊 Infrastructure Status Report
-
-The `/lab-status` command generates comprehensive reports:
-
-```markdown
-# 📊 Homelab Status Report
-
-## 🖥️ Proxmox Cluster
-
-| Node | Status | CPU | RAM | VMs |
-|------|--------|-----|-----|-----|
-| node01 | 🟢 Online | 23% | 45/64 GB | 8 |
-| node02 | 🟢 Online | 18% | 32/48 GB | 6 |
-| node03 | 🟢 Online | 12% | 24/32 GB | 4 |
-
-## ☸️ Kubernetes Cluster
-
-| Component | Count | Status |
-|-----------|-------|--------|
-| Control Plane | 3 | 🟢 Healthy |
-| Workers | 6 | 🟢 Ready |
-
-## 📦 Services
-
-| Category | Running | Status |
-|----------|---------|--------|
-| Media Stack | 14/14 | 🟢 All Running |
-| Core Services | 8/8 | 🟢 All Running |
-| Monitoring | 5/5 | 🟢 All Running |
-```
-
----
-
-## 🔍 IP Address Management
-
-Never have IP conflicts again! The `/ip-find` command:
+### `/ip-find next vlan40`
 
 ```markdown
 # 🔍 IP Address Finder
 
-## VLAN 20 - Homelab (192.168.20.0/24)
+## VLAN 40 - Services (10.0.40.0/24)
 
-### Allocated (35 IPs)
-| IP | Device | Type |
-|----|--------|------|
-| 192.168.20.20 | node01 | Proxmox |
-| 192.168.20.21 | node02 | Proxmox |
-| 192.168.20.50 | k8s-cp-01 | K8s Control |
-| ... | ... | ... |
+⚠️ Conflict: 10.0.40.14 is claimed by bots-lxc and api-lxc
 
-### Next Available
-✅ **192.168.20.100** ← Recommended for new VM
+✅ Recommended: 10.0.40.28
+Also free: 10.0.40.29, 10.0.40.30
 ```
 
-### Arguments
+### `/capacity plan 2cpu 4gb`
 
-- `/ip-find` - Summary of all VLANs
-- `/ip-find vlan20` - Specific VLAN
-- `/ip-find check 192.168.20.100` - Check if IP is in use
-- `/ip-find next` - Next available IP
+```markdown
+# 🧮 Capacity Check: New Guest
+
+✅ CAN DEPLOY
+
+| Node   | RAM After | Status      |
+|--------|-----------|-------------|
+| node01 | 74%       | 🟡 Possible |
+| node02 | 100%      | 🔴 Avoid    |
+| node03 | 61%       | 🟢 Best     |
+
+Recommendation: node03. Consider an LXC instead of a VM to save RAM.
+```
+
+### `/lab-changelog add "Deployed paperless on utility VM"`
+
+```markdown
+## [2026-10-06] - Deployed paperless
+
+### Added
+- ✅ New service: Paperless-ngx on utility-vm01 - document management
+  - File or resource affected: `services.md`
+
+Protocol follow-ups:
+- [x] Services doc updated
+- [x] updated: frontmatter bumped
+- [x] Task Registry: "Deploy paperless" → ✅ Completed
+```
 
 ---
 
-## 🚀 Deployment Code Generator
+## 🌍 In the Wild
 
-Generate infrastructure code instantly with `/deploy-new`:
+Homelab Agent runs the author's own homelab every day: a **3-node Proxmox VE cluster with a QDevice, about 18 guests** (a handful of VMs and a dozen LXCs) running Traefik, Authentik SSO, Pi-hole, GitLab with CI runners, Immich, a media stack, Home Assistant, Prometheus/Grafana, and a set of custom dashboards and APIs. The docs it reads live in an Obsidian vault, and the same Changelog + Task Registry pattern shipped here keeps several Claude Code sessions in sync.
 
-```bash
-/deploy-new docker jellyfin
-```
+- 📚 Infrastructure docs: [herms14/homelab-infrastructure](https://github.com/herms14/homelab-infrastructure)
+- ✍️ Blog, Clustered Thoughts: [herms14.github.io/Clustered-Thoughts](https://herms14.github.io/Clustered-Thoughts/)
 
-Generates:
-
-```yaml
-# docker-compose.jellyfin.yml
-services:
-  jellyfin:
-    image: jellyfin/jellyfin:latest
-    container_name: jellyfin
-    restart: unless-stopped
-    ports:
-      - "8096:8096"
-    volumes:
-      - /srv/jellyfin/config:/config
-      - /srv/jellyfin/media:/media
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.domain.xyz`)"
-```
-
-Plus:
-- Terraform VM configuration
-- Traefik routing rules
-- Authentik SSO setup
-- Documentation updates
+The lab has changed a lot since v1.0 (Kubernetes and a hybrid cloud lab were retired, most services moved to LXCs). That is why v1.1 added **Retired Components** and **Known Gotchas**: docs have to describe what is gone and what bites, not only what exists.
 
 ---
 
 ## ⚙️ Customization
 
-### Configure CLAUDE.md
+Most customization happens in `CLAUDE.md`, not in the command files:
 
-The agent reads `CLAUDE.md` from your documentation root for context. Customize it for your environment:
+| Want to... | Edit |
+|------------|------|
+| Point commands at your files | `Documentation Structure` table |
+| Change default VLAN / URL pattern / SSO | `Network Architecture`, `Service Conventions` |
+| Stop reporting Kubernetes (or anything else) | `Retired Components` |
+| Teach the agent a trap to avoid | `Known Gotchas` |
+| Keep secrets out of reach | `Sensitive` role (never read) |
 
-```markdown
-## Homelab Overview
-
-**Cluster Name**: MorpheusCluster
-**Domain**: yourdomain.xyz
-**Primary VLAN**: 20 (192.168.20.0/24)
-
-## Infrastructure
-
-### Proxmox Nodes
-| Node | IP | Role |
-|------|-----|------|
-| node01 | 192.168.20.20 | Primary |
-| node02 | 192.168.20.21 | Secondary |
-
-### Documentation Files
-| File | Purpose |
-|------|---------|
-| `network.md` | Network architecture |
-| `services.md` | Service catalog |
-| `ips.md` | IP allocations |
-```
-
-### Documentation Structure
-
-The agent works best with organized documentation:
-
-```
-your-docs/
-├── .claude/
-│   └── commands/        # Agent skills
-├── CLAUDE.md            # Agent context
-├── network.md           # Network architecture
-├── proxmox.md           # Cluster documentation
-├── kubernetes.md        # K8s documentation
-├── services.md          # Service catalog
-├── ips.md               # IP allocations
-├── troubleshooting.md   # Known issues
-└── changelog.md         # Change log
-```
+See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for layouts (flat, folders, numbered Obsidian notes) and writing your own commands.
 
 ---
 
-## 📁 File Structure
+## 📁 Repository Layout
 
 ```
 homelab-agent/
-├── commands/
-│   ├── homelab.md           # Main menu
-│   ├── lab-status.md        # Status reports
-│   ├── service-list.md      # Service catalog
-│   ├── ip-find.md           # IP management
-│   ├── deploy-new.md        # Code generator
-│   ├── troubleshoot.md      # Troubleshooting
-│   ├── lab-changelog.md     # Change logging
-│   ├── runbook.md           # Runbook generator
-│   ├── capacity.md          # Capacity planning
-│   └── doc-sync.md          # Doc verification
+├── commands/                 # Slash commands → copy to .claude/commands/
+│   ├── homelab.md
+│   ├── lab-status.md
+│   ├── service-list.md
+│   ├── ip-find.md
+│   ├── deploy-new.md
+│   ├── troubleshoot.md
+│   ├── lab-changelog.md
+│   ├── runbook.md
+│   ├── capacity.md
+│   └── doc-sync.md
+├── templates/                # Starter docs the commands maintain
+│   ├── Homelab Changelog.md
+│   └── Task Registry.md
 ├── docs/
-│   ├── INSTALLATION.md      # Setup guide
-│   ├── COMMANDS.md          # Command reference
-│   └── CUSTOMIZATION.md     # Customization guide
-├── CLAUDE.md.template       # Template for users
-├── LICENSE                  # MIT License
-└── README.md                # This file
+│   ├── INSTALLATION.md
+│   ├── COMMANDS.md
+│   └── CUSTOMIZATION.md
+├── CLAUDE.md.template        # → copy to your docs root as CLAUDE.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── LICENSE
 ```
 
 ---
 
-## 🎨 Use Cases
+## 🔒 Safety
 
-### Daily Operations
-
-```bash
-# Morning status check
-/lab-status quick
-
-# Check service URLs
-/service-list
-
-# Review any changes
-/lab-changelog today
-```
-
-### Deploying New Services
-
-```bash
-# Check if resources available
-/capacity plan 4cpu 8gb
-
-# Find an IP
-/ip-find next vlan20
-
-# Generate deployment code
-/deploy-new docker my-service
-
-# Log the change
-/lab-changelog add "Deployed my-service"
-```
-
-### Troubleshooting
-
-```bash
-# Search for known issues
-/troubleshoot container won't start
-
-# Generate diagnostic commands
-/troubleshoot diag traefik
-
-# Check documentation for related info
-/doc-sync services
-```
-
-### Maintenance
-
-```bash
-# Generate maintenance runbook
-/runbook maintenance
-
-# Plan node upgrade
-/capacity node node01
-
-# Verify docs are current
-/doc-sync
-```
-
----
-
-## 🔗 Integration
-
-### Works With
-
-| Tool | Integration |
-|------|-------------|
-| **Proxmox VE** | Reads cluster/VM documentation |
-| **Kubernetes** | Understands K8s concepts |
-| **Docker** | Generates compose files |
-| **Terraform** | Generates HCL modules |
-| **Ansible** | Generates playbooks |
-| **Traefik** | Routing configuration |
-| **Authentik** | SSO setup guidance |
-
-### Pairs Well With
-
-- [Obsidian Vault Agent](https://github.com/herms14/obsidian-vault-agent) - General vault maintenance
-- Your existing IaC workflows
-- GitOps pipelines
+- Commands are told never to open the doc you mark as **Sensitive** and never to print secrets.
+- Live commands are read-only. Anything destructive (`destroy`, `rm -rf`) requires your confirmation.
+- Nothing leaves your machine except what Claude Code itself sends to the model.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+PRs welcome. Keep commands generic: no real IPs, hostnames, domains, or secrets; use doc roles and `[placeholders]`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Ideas for Contributions
-
-- [ ] Additional deployment templates
-- [ ] More runbook templates
-- [ ] Integration with monitoring APIs
-- [ ] Cost tracking features
+Ideas: more runbook templates, Proxmox Backup Server checks, monitoring API integrations, Unraid/TrueNAS variants.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- The homelab community for inspiration
-- [Proxmox](https://www.proxmox.com/) for amazing virtualization
-- [Claude Code](https://claude.ai/code) for AI-powered automation
-- [Obsidian](https://obsidian.md) for knowledge management
+MIT. See [LICENSE](LICENSE).
 
 ---
 
 ## 📬 Support
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/herms14/homelab-agent/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/herms14/homelab-agent/discussions)
-- 🏠 **Reddit**: r/homelab, r/selfhosted
-
----
+- 🐛 [GitHub Issues](https://github.com/herms14/homelab-agent/issues)
+- 💬 [GitHub Discussions](https://github.com/herms14/homelab-agent/discussions)
+- 🏠 r/homelab, r/selfhosted
 
 <p align="center">
   Made with ❤️ for the homelab community

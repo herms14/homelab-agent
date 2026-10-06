@@ -1,21 +1,85 @@
 # Homelab Context
 
-> Customize this file for your infrastructure. Place it in your documentation root.
+> Customize this file for your infrastructure and save it as `CLAUDE.md` in your documentation root.
+> Claude Code loads it automatically, and every Homelab Agent command reads it first.
+> Values in `[brackets]` are placeholders. Example IPs use `10.0.x.x`; replace them with your own.
+
+---
 
 ## Overview
 
 **Cluster Name**: [YourClusterName]
 **Domain**: [yourdomain.xyz]
 **Owner**: [Your Name]
+**Timezone**: [Region/City]
+**SSH user**: [admin-user]
 
 ## Infrastructure Summary
 
 | Component | Count | Notes |
 |-----------|-------|-------|
-| Proxmox Nodes | [X] | |
-| Virtual Machines | [X] | |
+| Proxmox Nodes | [X] | [+ QDevice?] |
+| Virtual Machines | [X] | Including templates? |
+| LXC Containers | [X] | |
 | Docker Services | [X] | |
-| Kubernetes Nodes | [X] | Optional |
+| Kubernetes Nodes | [X] | Optional. Write `Decommissioned YYYY-MM-DD` if retired |
+
+---
+
+## Documentation Structure
+
+> The commands look up files by **role**, using this table. Update the paths to match your docs.
+> Leave a row out (or write `n/a`) if you don't have that doc. Commands skip roles that are missing.
+
+| Role | Path | Purpose |
+|------|------|---------|
+| Index | `[path/to/index.md]` | Main navigation / overview |
+| Network | `[path/to/network.md]` | VLANs, topology, DNS, remote access |
+| Proxmox | `[path/to/proxmox.md]` | Nodes, VMs, LXCs, templates |
+| Storage | `[path/to/storage.md]` | NAS, NFS exports, storage pools, backups |
+| Kubernetes | `[path/to/kubernetes.md]` | Optional |
+| Services | `[path/to/services.md]` | Service catalog (name, URL, host, port, auth) |
+| IP Map | `[path/to/ip-map.md]` | Every IP allocation |
+| Reverse Proxy | `[path/to/traefik.md]` | Routing conventions |
+| SSO | `[path/to/sso.md]` | Authentik / Authelia setup |
+| Monitoring | `[path/to/monitoring.md]` | Prometheus, Grafana, Uptime Kuma, etc. |
+| Automation | `[path/to/automation.md]` | Terraform / Ansible / CI patterns |
+| Onboarding | `[path/to/new-service-guide.md]` | How you add a new service |
+| Troubleshooting | `[path/to/troubleshooting.md]` | Known issues and fixes |
+| Runbooks | `[path/to/runbooks/]` | Where generated runbooks are saved |
+| Changelog | `[path/to/Homelab Changelog.md]` | Infrastructure change log (see Change Protocol) |
+| Task Registry | `[path/to/Task Registry.md]` | Agent task coordination (see Task Coordination) |
+| Sensitive | `[path/to/credentials.md]` | **Never read or print.** Listed only so the agent avoids it |
+
+Starter files for the Changelog and Task Registry are in the repo's `templates/` folder.
+
+---
+
+## Change Documentation Protocol (MANDATORY)
+
+Every time the agent makes or helps make an infrastructure change, configuration update, or documentation edit:
+
+1. **Changelog**: add an entry under today's date in the Changelog doc. Categories: Added / Changed / Fixed / Removed / Infrastructure / Security.
+2. **Relevant doc**: update the doc that owns the fact:
+   - Service added or changed → Services
+   - IP added or changed → IP Map
+   - New VM / LXC → Proxmox
+   - Network change → Network
+   - Storage change → Storage
+3. **Frontmatter**: if your docs use YAML frontmatter, set `updated: YYYY-MM-DD` on every modified file.
+4. **Task Registry**: mark the task's status (see below).
+
+---
+
+## Task Coordination (Multi-Session)
+
+If you run more than one Claude Code session against these docs, every session reads the Task Registry first.
+
+- **Before starting**: check whether the task is already `🔄 In Progress`
+- **When starting**: mark it `🔄 In Progress` with a timestamp
+- **When finished**: mark it `✅ Completed` with a timestamp and a short note
+- **When blocked**: mark it `⏸️ Blocked` and note the blocker
+- **New work discovered**: add it as `📋 Pending`
 
 ---
 
@@ -25,9 +89,13 @@
 
 | VLAN | Name | Subnet | Purpose |
 |------|------|--------|---------|
-| 1 | Default | 192.168.1.0/24 | General network |
-| 10 | Management | 192.168.10.0/24 | Network management |
-| 20 | Servers | 192.168.20.0/24 | Server/VM VLAN |
+| 10 | Management | 10.0.10.0/24 | Network devices, DNS |
+| 20 | Servers | 10.0.20.0/24 | Hypervisors, VMs |
+| 40 | Services | 10.0.40.0/24 | Docker / LXC services |
+
+**Default VLAN for new VMs/services**: [20]
+**DNS server**: [10.0.10.53]
+**Remote access**: [Tailscale / WireGuard / None]
 
 ### IP Allocation Conventions
 
@@ -46,8 +114,8 @@
 
 | Node | IP | Role | Specs |
 |------|-----|------|-------|
-| [node01] | [192.168.20.20] | Primary | [CPU, RAM] |
-| [node02] | [192.168.20.21] | Secondary | [CPU, RAM] |
+| [node01] | [10.0.20.11] | Primary | [CPU, RAM] |
+| [node02] | [10.0.20.12] | Secondary | [CPU, RAM] |
 
 ### Storage Pools
 
@@ -56,20 +124,10 @@
 | local-lvm | LVM | - | VM disks |
 | [nfs-storage] | NFS | [NAS IP] | Shared storage |
 
----
+### Backups
 
-## Documentation Structure
-
-> Update these paths to match your actual files
-
-| File | Purpose |
-|------|---------|
-| `[path/to/network.md]` | Network architecture |
-| `[path/to/services.md]` | Service catalog |
-| `[path/to/ips.md]` | IP address allocations |
-| `[path/to/proxmox.md]` | Proxmox cluster details |
-| `[path/to/troubleshooting.md]` | Known issues |
-| `[path/to/changelog.md]` | Change log |
+- Backup server: [Proxmox Backup Server / vzdump to NFS / None]
+- Schedule: [daily 02:00]
 
 ---
 
@@ -100,11 +158,35 @@
 - Inventory: `./ansible/inventory/hosts.yml`
 - Playbooks: `./ansible/playbooks/`
 
+### CI / GitOps
+- [e.g. GitLab CI deploys on push to main]
+
 ---
 
-## Important Notes
+## Retired Components
 
-> Add any special considerations for your environment
+> List anything decommissioned so the agent stops reporting it and treats its IPs as free.
 
-- [Note 1]
-- [Note 2]
+| Component | Retired | Notes |
+|-----------|---------|-------|
+| [Kubernetes cluster] | [YYYY-MM-DD] | [IPs .50-.70 freed] |
+
+---
+
+## Known Gotchas
+
+> Hard-won lessons the agent must respect. `/troubleshoot`, `/ip-find` and `/deploy-new` check this list.
+
+- [e.g. NAS NIC at 10.0.20.30 is dead; always use 10.0.20.31]
+- [e.g. After recreating an LXC, flush stale ARP on every node: `ip neigh flush dev vmbr0 <IP>`]
+
+---
+
+## Behavioral Rules
+
+1. Follow the Change Documentation Protocol for every change
+2. Check the Task Registry before starting work
+3. Never read, print, or commit secrets. Skip the `Sensitive` doc entirely
+4. Preserve existing content. Never delete documentation without asking
+5. Ask before running anything destructive (`terraform destroy`, `qm destroy`, `rm -rf`)
+6. Prefer documented facts over guesses. If docs and reality disagree, suggest `/doc-sync`

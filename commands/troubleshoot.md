@@ -4,29 +4,38 @@ Search troubleshooting guides and get help with homelab issues.
 
 ## Instructions
 
-Help diagnose and resolve homelab infrastructure issues.
+Help diagnose and resolve homelab infrastructure issues, using your own documented history first.
 
 ### Data Sources
 
-Read these files:
-- `07 HomeLab Things/Claude Managed Homelab/12 - Troubleshooting.md` - Known issues
-- `07 HomeLab Things/Claude Managed Homelab/25 - Homelab Master Wiki.md` - Reference
-- All other homelab docs for context
+Read `CLAUDE.md` first, especially **Known Gotchas** and **Retired Components**. Then, using its **Documentation Structure** table, read:
+- **Troubleshooting** - Known issues and fixes
+- **Changelog** - Recent changes (a recent change is often the cause)
+- **Services**, **Network**, **Proxmox**, **Reverse Proxy**, **SSO** - As relevant to the issue
+
+Never open the doc listed under the **Sensitive** role.
+
+### Approach
+
+1. Match the symptoms against Known Gotchas and the Troubleshooting doc first.
+2. Check the Changelog for changes in the last few days that touch the affected service, host, or IP.
+3. Suggest read-only diagnostics before any fix. Ask before restarting or changing anything.
+4. After a fix, offer to add a Troubleshooting entry and a Changelog `Fixed` entry.
 
 ### Common Issue Categories
 
 1. **Container Issues** - Docker/LXC problems
-2. **Network Issues** - Connectivity, DNS, routing
-3. **Proxmox Issues** - Cluster, VMs, storage
-4. **Kubernetes Issues** - Pods, services, networking
+2. **Network Issues** - Connectivity, DNS, routing, VLANs, stale ARP
+3. **Proxmox Issues** - Cluster, quorum, VMs, storage
+4. **Kubernetes Issues** - Pods, services, networking (if active)
 5. **Service Issues** - Specific application problems
-6. **Authentication Issues** - Authentik, SSO
-7. **Storage Issues** - NFS, disk space
-8. **Certificate Issues** - SSL/TLS, Let's Encrypt
+6. **Authentication Issues** - SSO, forward auth
+7. **Storage Issues** - NFS, disk space, full disks from logs
+8. **Certificate Issues** - TLS, Let's Encrypt
 
 ### Output Format - Issue Search
 
-```markdown
+````markdown
 # 🔧 Troubleshooting: [Issue Description]
 
 ## 🔍 Matching Known Issues
@@ -38,15 +47,15 @@ Read these files:
 ```bash
 [Commands to fix]
 ```
-**Related Docs**: [[12 - Troubleshooting#Section]]
+**Source**: [Troubleshooting doc section / Known Gotcha]
 
 ---
 
-### Issue 2: [Title]
-**Symptoms**: [What you see]
-**Cause**: [Root cause]
-**Solution**: [Steps]
-**Related Docs**: [[Doc Name]]
+## 🕑 Recent Related Changes
+
+| Date | Change |
+|------|--------|
+| [date] | [Changelog entry touching this service/host] |
 
 ---
 
@@ -54,58 +63,30 @@ Read these files:
 
 ### Check Service Status
 ```bash
-# Docker
 docker ps -a | grep [service]
 docker logs --tail 100 [container]
-
-# Systemd
 systemctl status [service]
 journalctl -u [service] --since "1 hour ago"
 ```
 
 ### Check Network
 ```bash
-# Test connectivity
-ping [ip]
+ping -c 3 [ip]
 curl -v http://[ip]:[port]
-
-# DNS resolution
-nslookup [domain]
-dig [domain]
-
-# Check Traefik routing
-curl -H "Host: [service].hrmsmrflrii.xyz" http://localhost:8080
+dig [service].[domain]
+curl -H "Host: [service].[domain]" http://[proxy-ip]
 ```
 
 ### Check Resources
 ```bash
-# Disk space
 df -h
-
-# Memory
 free -h
-
-# CPU/processes
-htop
-```
-
-### Check Logs
-```bash
-# Traefik
-docker logs traefik --tail 100 | grep [service]
-
-# Authentik
-docker logs authentik-server --tail 100
-
-# Proxmox
-journalctl -u pvedaemon --since "1 hour ago"
+du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail
 ```
 
 ---
 
 ## 🎯 Suggested Actions
-
-Based on your issue, try:
 
 1. **First**: [Quick fix attempt]
 2. **If that fails**: [Next step]
@@ -113,63 +94,65 @@ Based on your issue, try:
 
 ---
 
-## 📚 Related Documentation
-
-- [[12 - Troubleshooting]] - Full troubleshooting guide
-- [[09 - Traefik Reverse Proxy]] - Routing issues
-- [[14 - Authentik Google SSO Setup]] - Auth issues
-- [[02 - Proxmox Cluster]] - Cluster issues
-
----
-
 ## ❓ Still Stuck?
 
 Would you like me to:
-1. Generate a detailed diagnostic script?
+1. Generate a diagnostic script?
 2. Search all documentation for related issues?
-3. Help create a new troubleshooting entry?
-4. Check service-specific documentation?
-```
+3. Add this as a new troubleshooting entry?
+````
+
+### Generic Gotchas Worth Checking
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Ping works, TCP says "connection refused" right after a CT/VM was recreated or its MAC changed | Stale ARP entry on Proxmox nodes | `ip neigh flush dev vmbr0 [ip]` on each node |
+| Two hosts flap on the same IP | Duplicate IP allocation | `/ip-find conflicts`, then re-IP one host |
+| Disk suddenly full on a Docker host | Unrotated container logs | Set json-file `max-size`/`max-file` in `/etc/docker/daemon.json` |
+| NFS mounts hang at boot | Mount without `_netdev`/`soft` | Use `soft,timeo=30,retrans=3,_netdev` |
+| 404 from reverse proxy | Router rule or entrypoint mismatch | Check the router in the proxy dashboard/logs |
+| Redirect loop on SSO | Forward-auth middleware on the SSO host itself | Exclude the auth domain from the middleware |
+| Cluster actions fail with "no quorum" | Node or QDevice down | `pvecm status`, restore the node/QDevice |
 
 ### Quick Diagnostics by Category
 
-**Docker Issues**:
+**Docker**:
 ```bash
-docker ps -a                    # List all containers
-docker logs [container]         # Check logs
-docker inspect [container]      # Full details
-docker stats                    # Resource usage
+docker ps -a
+docker logs [container]
+docker inspect [container]
+docker stats --no-stream
 ```
 
-**Network Issues**:
+**Network**:
 ```bash
-ip addr                         # Network interfaces
-ip route                        # Routing table
-ss -tulpn                       # Listening ports
-ping/curl/traceroute           # Connectivity
+ip addr
+ip route
+ip neigh
+ss -tulpn
 ```
 
-**Proxmox Issues**:
+**Proxmox**:
 ```bash
-pvecm status                    # Cluster status
-qm list                         # VM list
-pct list                        # Container list
-pvesm status                    # Storage status
+pvecm status
+qm list
+pct list
+pvesm status
 ```
 
-**Kubernetes Issues**:
+**Kubernetes**:
 ```bash
-kubectl get nodes               # Node status
-kubectl get pods -A             # All pods
-kubectl describe pod [pod]      # Pod details
-kubectl logs [pod]              # Pod logs
+kubectl get nodes
+kubectl get pods -A
+kubectl describe pod [pod]
+kubectl logs [pod]
 ```
 
 ### Add New Troubleshooting Entry
 
-When adding a new issue to documentation:
+Append to the **Troubleshooting** doc, then add a Changelog `Fixed` entry:
 
-```markdown
+````markdown
 ## [Issue Title]
 
 **Symptoms**:
@@ -185,9 +168,9 @@ When adding a new issue to documentation:
 
 **Prevention**:
 [How to prevent in future]
+````
 
-**Related**: [[Doc Links]]
-```
+If the issue is a recurring trap, also suggest adding a one-line rule under **Known Gotchas** in `CLAUDE.md`.
 
 ## Arguments
 

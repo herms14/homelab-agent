@@ -1,14 +1,16 @@
 # Lab Changelog
 
-Log infrastructure changes to maintain an audit trail.
+Log infrastructure changes to maintain an audit trail, and keep the Task Registry in step.
 
 ## Instructions
 
-Manage the homelab infrastructure changelog for tracking all changes.
+Manage the homelab infrastructure changelog. This command implements step 1 of the **Change Documentation Protocol** in `CLAUDE.md`, and reminds you of steps 2-4.
 
 ### Changelog Location
 
-Create/update: `07 HomeLab Things/Claude Managed Homelab/Homelab Changelog.md`
+Use the doc listed under the **Changelog** role in `CLAUDE.md`. If none is configured, offer to create `Homelab Changelog.md` in the docs root from `templates/Homelab Changelog.md`.
+
+Newest entries go at the top, under a `## [YYYY-MM-DD] - Short title` heading. If today's heading already exists, append to it instead of creating a second one.
 
 ### Change Categories
 
@@ -17,50 +19,43 @@ Create/update: `07 HomeLab Things/Claude Managed Homelab/Homelab Changelog.md`
 - **Fixed** - Bug fixes, issue resolutions
 - **Removed** - Decommissioned services, deleted resources
 - **Infrastructure** - Hardware, network, cluster changes
-- **Security** - Security updates, access changes
+- **Security** - Security updates, access changes, key rotations (never log the secret itself)
 
 ### Output Format - View Changelog
 
 ```markdown
 # 📋 Homelab Changelog
 
-> Infrastructure change log for MorpheusCluster
+> Infrastructure change log for [Cluster Name]
 
 ---
 
-## [2026-01-16] - [Brief Description]
+## [YYYY-MM-DD] - [Brief Description]
 
 ### Added
 - ✅ New service: [Name] - [Description]
-- ✅ New VM: [Name] on [node] - [Purpose]
+  - File or resource affected: `path/to/file`
 
 ### Changed
-- 🔄 Updated [service] from [old] to [new]
 - 🔄 Increased [VM] memory: [old] → [new]
-- 🔄 Modified Traefik routing for [service]
 
 ### Fixed
 - 🔧 Resolved [issue description]
-- 🔧 Fixed [service] connectivity issue
 
 ### Infrastructure
 - 🖥️ Added [hardware/component]
-- 📦 Deployed new storage pool
 
 ### Security
-- 🔒 Updated SSL certificates
-- 🔒 Modified firewall rules for [purpose]
+- 🔒 Rotated [service] API key
 
 ---
 
-## [2026-01-15] - Previous Entry
+## [YYYY-MM-DD] - Previous Entry
 
 ...
 ```
 
 ### Output Format - Add Entry
-
-When adding a new entry:
 
 ```markdown
 # 📋 Add Changelog Entry
@@ -73,25 +68,28 @@ When adding a new entry:
 
 ### [Category]
 - [emoji] [Description]
+  - File or resource affected: `[path or resource]`
 
 ---
 
 ✅ Entry added to Homelab Changelog
 
-Would you like to:
-1. Add another entry?
-2. View full changelog?
-3. Update related documentation?
+## Protocol Follow-ups
+- [ ] Relevant doc updated? → [suggested doc role, e.g. Services / IP Map / Proxmox]
+- [ ] `updated:` frontmatter bumped on modified docs
+- [ ] Task Registry updated → [matching task, if found]
 ```
+
+When a matching task exists in the **Task Registry**, offer to mark it `✅ Completed` with today's timestamp and the changelog line as the note.
 
 ### Auto-Detection
 
-When run without description, check for recent changes:
+When run without a description, look for undocumented changes:
 
-1. **New files** in homelab folder (last 24h)
-2. **Modified files** in homelab folder (last 24h)
-3. **Git commits** if repo exists
-4. **Prompt** user to describe changes
+1. **Modified docs** in the homelab docs folder (last 24h)
+2. **Git commits** if the docs folder is a repo (`git log --since="24 hours ago" --oneline`)
+3. **Task Registry** items marked `✅ Completed` today with no Changelog entry
+4. **Prompt** the user to describe anything else
 
 ### Entry Format by Category
 
@@ -123,6 +121,8 @@ When run without description, check for recent changes:
   - Replacement: [if any]
 ```
 
+When removing something significant (a cluster, a host, a whole stack), also suggest adding it to **Retired Components** in `CLAUDE.md` so other commands stop reporting it.
+
 **Infrastructure**:
 ```markdown
 - 🖥️ [Component]: [Change description]
@@ -137,9 +137,8 @@ When run without description, check for recent changes:
 
 ### Statistics
 
-Track monthly/weekly stats:
 ```markdown
-## Monthly Summary - January 2026
+## Monthly Summary - [Month YYYY]
 
 | Category | Count |
 |----------|-------|
@@ -162,4 +161,5 @@ Track monthly/weekly stats:
 - `/lab-changelog month` - This month's changes
 - `/lab-changelog search [term]` - Search changelog
 - `/lab-changelog stats` - Show statistics
+- `/lab-changelog detect` - Find undocumented changes (auto-detection only)
 - `/lab-changelog export` - Export as markdown

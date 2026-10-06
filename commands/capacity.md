@@ -8,25 +8,39 @@ Analyze current resource utilization and plan for new deployments.
 
 ### Data Sources
 
-Read these files:
-- `07 HomeLab Things/Claude Managed Homelab/02 - Proxmox Cluster.md` - Compute resources
-- `07 HomeLab Things/Claude Managed Homelab/04 - Kubernetes Cluster.md` - K8s resources
-- `07 HomeLab Things/Claude Managed Homelab/03 - Storage Architecture.md` - Storage
+Read `CLAUDE.md` first (node specs, storage pools, **Retired Components**). Then, using its **Documentation Structure** table, read:
+- **Proxmox** - Compute resources and guest allocations
+- **Storage** - Pools, NAS, backups
+- **IP Map** - IP availability
+- **Kubernetes** - K8s resources (skip if missing or retired)
+
+### Live Data (optional)
+
+If the user has shell access to a Proxmox node, prefer live numbers and say so:
+
+```bash
+pvesh get /cluster/resources --type node --output-format json
+pvesh get /cluster/resources --type vm --output-format json
+pvesm status
+```
+
+Read-only commands only.
 
 ### Resource Categories
 
-1. **Compute** - CPU cores, RAM
-2. **Storage** - Disk space, IOPS
-3. **Network** - Bandwidth, IPs
-4. **Kubernetes** - Pods, CPU/memory requests
+1. **Compute** - CPU cores, RAM (allocated vs physical; note overcommit)
+2. **Storage** - Disk space per pool
+3. **Network** - Free IPs per VLAN
+4. **Kubernetes** - Pods, CPU/memory requests (only if active)
 
 ### Output Format - Full Report
 
-```markdown
+````markdown
 # 📈 Capacity Planning Report
 
 **Generated**: [Date]
-**Cluster**: MorpheusCluster
+**Cluster**: [Cluster Name]
+**Source**: Documentation / Live / Mixed
 
 ---
 
@@ -34,27 +48,28 @@ Read these files:
 
 ### Per-Node Breakdown
 
-| Node | vCPUs | vCPUs Used | RAM | RAM Used | VMs | Status |
-|------|-------|------------|-----|----------|-----|--------|
-| node01 | 24 | 16 (67%) | 64 GB | 45 GB (70%) | 8 | 🟢 OK |
-| node02 | 20 | 14 (70%) | 48 GB | 32 GB (67%) | 6 | 🟢 OK |
-| node03 | 24 | 14 (58%) | 32 GB | 24 GB (75%) | 4 | 🟡 RAM High |
+| Node | Cores | RAM | RAM Allocated | Guests | Status |
+|------|-------|-----|---------------|--------|--------|
+| [node01] | [16] | [64 GB] | [45 GB (70%)] | [10] | 🟢 OK |
+| [node02] | [16] | [32 GB] | [28 GB (88%)] | [4] | 🟡 RAM High |
 
 ### Cluster Totals
 
-| Resource | Used | Total | Available | Utilization |
-|----------|------|-------|-----------|-------------|
-| vCPUs | 44 | 68 | 24 | 65% |
-| RAM | 101 GB | 144 GB | 43 GB | 70% |
-| VMs | 18 | ~50 | 32 | 36% |
-
-### Utilization Graphs
+| Resource | Allocated | Total | Available | Utilization |
+|----------|-----------|-------|-----------|-------------|
+| Cores | [X] | [X] | [X] | [X]% |
+| RAM | [X] GB | [X] GB | [X] GB | [X]% |
 
 ```
 CPU:     [████████████░░░░░░░░] 65%
 Memory:  [██████████████░░░░░░] 70%
-VM Slots:[███████░░░░░░░░░░░░░] 36%
 ```
+
+### Largest Consumers
+
+| Guest | Node | RAM | Notes |
+|-------|------|-----|-------|
+| [name] | [node] | [X] GB | [right-size?] |
 
 ---
 
@@ -62,105 +77,54 @@ VM Slots:[███████░░░░░░░░░░░░░] 36%
 
 | Pool | Type | Used | Total | Available | Util% |
 |------|------|------|-------|-----------|-------|
-| VMDisks | NFS | 180 GB | 300 GB | 120 GB | 60% |
-| Media | NFS | 2.1 TB | 4 TB | 1.9 TB | 52% |
-| ISOs | NFS | 45 GB | 100 GB | 55 GB | 45% |
-| local-lvm | LVM | 80 GB | 200 GB | 120 GB | 40% |
-| **Total** | - | **2.4 TB** | **4.6 TB** | **2.2 TB** | **52%** |
-
-### Storage Graphs
-
-```
-VMDisks: [████████████░░░░░░░░] 60%
-Media:   [██████████░░░░░░░░░░] 52%
-ISOs:    [█████████░░░░░░░░░░░] 45%
-local:   [████████░░░░░░░░░░░░] 40%
-```
+| [pool] | NFS | [X] | [X] | [X] | [X]% |
+| local-lvm | LVM | [X] | [X] | [X] | [X]% |
 
 ---
 
 ## ☸️ Kubernetes Resources
 
-| Resource | Requested | Allocatable | Available | Util% |
-|----------|-----------|-------------|-----------|-------|
-| CPU | 12 cores | 24 cores | 12 cores | 50% |
-| Memory | 32 GB | 48 GB | 16 GB | 67% |
-| Pods | 85 | 330 | 245 | 26% |
-
-### Per-Node K8s
-
-| Node | Role | CPU Req | Mem Req | Pods |
-|------|------|---------|---------|------|
-| k8s-cp-01 | Control | 2 | 4 GB | 15 |
-| k8s-cp-02 | Control | 2 | 4 GB | 14 |
-| k8s-cp-03 | Control | 2 | 4 GB | 13 |
-| k8s-w-01 | Worker | 1 | 4 GB | 12 |
-| ... | ... | ... | ... | ... |
+*(Omit if Kubernetes is not used or is retired.)*
 
 ---
 
 ## 🌐 Network (IPs)
 
-| VLAN | Allocated | Total | Available | Util% |
-|------|-----------|-------|-----------|-------|
-| 20 - Homelab | 35 | 200 | 165 | 18% |
-| 30 - IoT | 12 | 200 | 188 | 6% |
-| 90 - Mgmt | 8 | 200 | 192 | 4% |
+| VLAN | Allocated | Usable | Available | Util% |
+|------|-----------|--------|-----------|-------|
+| [20] | [X] | [X] | [X] | [X]% |
 
 ---
 
 ## 🎯 Recommendations
 
 ### Can Deploy Now
-
-With current capacity, you can deploy:
-- **[X] small VMs** (2 vCPU, 4GB RAM)
-- **[X] medium VMs** (4 vCPU, 8GB RAM)
-- **[X] large VMs** (8 vCPU, 16GB RAM)
+- **[X] small guests** (2 vCPU, 2 GB RAM)
+- **[X] medium guests** (4 vCPU, 8 GB RAM)
+- **[X] large guests** (8 vCPU, 16 GB RAM)
 
 ### Optimal Placement
 
-| VM Size | Recommended Node | Reason |
-|---------|------------------|--------|
-| Small | node03 | Lowest utilization |
-| Medium | node03 | Best balance |
-| Large | node01 | Most headroom |
+| Size | Recommended Node | Reason |
+|------|------------------|--------|
+| Small | [node] | Lowest utilization |
+| Large | [node] | Most free RAM |
 
 ### Alerts
+⚠️ [Node or pool above 80%]
 
-⚠️ **node03 RAM**: 75% utilized - monitor closely
-⚠️ **VMDisks**: 60% - plan for expansion if growth continues
+### Upgrade / Right-Sizing Suggestions
 
-### Upgrade Recommendations
+| Priority | Action | Benefit |
+|----------|--------|---------|
+| [Medium] | [Add RAM to node02] | [Balance cluster] |
+| [Low] | [Shrink an over-provisioned VM] | [Free RAM] |
+````
 
-| Priority | Upgrade | Benefit |
-|----------|---------|---------|
-| Medium | node03 RAM +32GB | Balance cluster |
-| Low | Additional NVMe | Faster local storage |
-
----
-
-## 📊 Growth Projection (3 months)
-
-Based on current growth rate:
-
-| Resource | Current | Projected | Status |
-|----------|---------|-----------|--------|
-| Storage | 52% | 65% | 🟢 OK |
-| RAM | 70% | 78% | 🟡 Monitor |
-| CPU | 65% | 70% | 🟢 OK |
-
----
-
-## 🧮 Plan New VM
-
-Use `/capacity plan [specs]` to check if a new VM fits.
-```
-
-### Output Format - Plan New VM
+### Output Format - Plan New Guest
 
 ```markdown
-# 🧮 Capacity Check: New VM
+# 🧮 Capacity Check: New Guest
 
 **Requested**: [X] vCPUs, [X] GB RAM, [X] GB disk
 
@@ -170,43 +134,26 @@ Use `/capacity plan [specs]` to check if a new VM fits.
 
 ### Best Placement
 
-| Node | After Deploy | Status |
-|------|--------------|--------|
-| node01 | CPU: 75%, RAM: 78% | 🟡 Possible |
-| node02 | CPU: 80%, RAM: 75% | 🟡 Possible |
-| node03 | CPU: 66%, RAM: 83% | 🟡 Possible |
+| Node | RAM After | Status |
+|------|-----------|--------|
+| [node01] | [78%] | 🟡 Possible |
+| [node02] | [95%] | 🔴 Avoid |
 
-**Recommendation**: Deploy to **node03**
-- Lowest CPU utilization
-- Acceptable RAM headroom
+**Recommendation**: Deploy to **[node]**
+- [Reason]
 
-### Resource After Deployment
-
-| Resource | Before | After | Change |
-|----------|--------|-------|--------|
-| Cluster CPU | 65% | 70% | +5% |
-| Cluster RAM | 70% | 75% | +5% |
-| node03 CPU | 58% | 66% | +8% |
-| node03 RAM | 75% | 83% | +8% |
-
-### Storage Check
-
-| Pool | After | Status |
-|------|-------|--------|
-| VMDisks | 66% | 🟢 OK |
-
----
-
-## ⚠️ Warnings
-
-- node03 RAM will be at 83% after deployment
-- Consider migrating a small VM from node03 first
+**LXC or VM?** Suggest an LXC when the workload does not need its own kernel; it uses far less RAM.
 
 ## Next Steps
 
-1. Run `/deploy-new [name]` to generate deployment code
-2. Or adjust specs and re-check
+1. `/ip-find next` to pick an IP
+2. `/deploy-new [name]` to generate deployment code
 ```
+
+### Thresholds
+
+- 🟢 < 70% · 🟡 70-85% · 🔴 > 85%
+- Keep enough free RAM on the cluster to absorb the largest node's guests if you rely on HA or migration.
 
 ## Arguments
 
@@ -216,5 +163,5 @@ Use `/capacity plan [specs]` to check if a new VM fits.
 - `/capacity k8s` - Kubernetes only
 - `/capacity storage` - Storage only
 - `/capacity network` - IP availability
-- `/capacity forecast` - 3-month projection
+- `/capacity forecast` - 3-month projection based on Changelog growth
 - `/capacity node [name]` - Specific node details
